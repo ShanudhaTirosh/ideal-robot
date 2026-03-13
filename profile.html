@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restaurant Pro — Profile</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="page-loader" id="pageLoader"><div style="text-align:center"><div class="spinner" style="margin:0 auto 14px"></div></div></div>
+<div class="app-shell">
+  <nav class="sidebar" id="appSidebar"></nav>
+  <div class="main-area">
+    <div class="topbar" id="appTopbar"></div>
+    <div class="page-content fade-in">
+
+      <div class="section-hdr mb-4"><h2 class="section-title">My Profile</h2></div>
+
+      <div class="row g-4">
+
+        <!-- LEFT -->
+        <div class="col-lg-4">
+
+          <div class="card-c text-center mb-4">
+            <div class="av-wrap">
+              <div class="av-lg" id="profileAv">?</div>
+              <label class="av-upload" for="avatarInput" title="Change photo">📷</label>
+              <input type="file" id="avatarInput" accept="image/*" style="display:none" onchange="uploadAvatar(this)">
+            </div>
+            <h3 style="font-family:var(--font-d);font-size:20px;margin-bottom:4px" id="pName">Loading…</h3>
+            <div style="color:var(--text-3);font-size:13px" id="pEmail"></div>
+            <div style="margin-top:6px" id="pRole"></div>
+            <div style="display:flex;justify-content:space-around;margin-top:16px;padding-top:16px;border-top:1px solid var(--border-subtle)">
+              <div style="text-align:center">
+                <div style="font-family:var(--font-d);font-size:22px;font-weight:700" id="myOrdCnt">—</div>
+                <div style="font-size:11px;color:var(--text-3)">My Orders</div>
+              </div>
+              <div style="text-align:center">
+                <div style="font-family:var(--font-d);font-size:22px;font-weight:700" id="myActCnt">—</div>
+                <div style="font-size:11px;color:var(--text-3)">Actions</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card-c">
+            <div class="card-title" style="margin-bottom:16px">⚙️ Preferences</div>
+
+            <div class="pref-row">
+              <div><div class="pref-lbl">Dark Mode</div><div class="pref-desc">Toggle light / dark theme</div></div>
+              <div class="sw" id="swDark" onclick="togglePref('dark',this)"></div>
+            </div>
+            <div class="pref-row">
+              <div><div class="pref-lbl">Sound Alerts</div><div class="pref-desc">Audio on new orders</div></div>
+              <div class="sw" id="swSound" onclick="togglePref('sound',this)"></div>
+            </div>
+
+            <div style="margin-top:16px">
+              <label class="flabel">Currency Symbol</label>
+              <select class="fc" id="currencySel" onchange="savePref('currency',this.value)">
+                <option value="₨">₨  —  LKR (Sri Lankan Rupee)</option>
+                <option value="$">$  —  USD (US Dollar)</option>
+                <option value="€">€  —  EUR (Euro)</option>
+                <option value="£">£  —  GBP (British Pound)</option>
+                <option value="₹">₹  —  INR (Indian Rupee)</option>
+                <option value="¥">¥  —  JPY / CNY</option>
+                <option value="฿">฿  —  THB (Thai Baht)</option>
+                <option value="AED">AED  —  UAE Dirham</option>
+                <option value="SAR">SAR  —  Saudi Riyal</option>
+                <option value="SGD">SGD  —  Singapore Dollar</option>
+              </select>
+            </div>
+
+            <div style="margin-top:12px">
+              <label class="flabel">Tax Rate (%)</label>
+              <input type="number" class="fc" id="taxRateInp" min="0" max="99" step="0.5" placeholder="8"
+                onchange="savePref('taxRate', this.value)">
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT -->
+        <div class="col-lg-8">
+
+          <!-- Branding -->
+          <div class="card-c mb-4">
+            <div class="card-title mb-3">🏪 Restaurant Branding</div>
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="flabel">Logo <span style="color:var(--text-3);font-weight:400">(appears in sidebar &amp; receipts)</span></label>
+                <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+                  <div id="logoPreviewWrap" style="width:68px;height:68px;border-radius:14px;overflow:hidden;background:var(--accent);border:2px solid var(--accent);display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0;box-shadow:0 0 20px var(--accent-glow)">🍽️</div>
+                  <div>
+                    <label class="btn-g btn-sm" for="logoInput" style="cursor:pointer">📷 Upload Logo</label>
+                    <input type="file" id="logoInput" accept="image/*" style="display:none" onchange="handleLogoSelect(this)">
+                    <div style="font-size:11.5px;color:var(--text-3);margin-top:5px">Square image, PNG/JPG, max 2MB recommended</div>
+                    <button class="btn-d btn-sm" style="margin-top:6px" onclick="removeLogo()">🗑️ Remove Logo</button>
+                  </div>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <label class="flabel">Restaurant Name</label>
+                <input type="text" class="fc" id="restName" placeholder="My Restaurant">
+              </div>
+              <div class="col-md-6">
+                <label class="flabel">Tagline</label>
+                <input type="text" class="fc" id="restTagline" placeholder="Fine dining since 2020">
+              </div>
+              <div class="col-12">
+                <button class="btn-p" onclick="saveBranding()">💾 Save Branding</button>
+                <span id="brandingStatus" style="font-size:12px;color:var(--text-3);margin-left:10px"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Edit Profile -->
+          <div class="card-c mb-4">
+            <div class="card-title mb-3">✏️ Edit Profile</div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="flabel">Display Name</label>
+                <input type="text" class="fc" id="editName" placeholder="Your full name">
+              </div>
+              <div class="col-md-6">
+                <label class="flabel">Phone</label>
+                <input type="tel" class="fc" id="editPhone" placeholder="+94 71 234 5678">
+              </div>
+              <div class="col-md-6">
+                <label class="flabel">Email</label>
+                <input type="email" class="fc" id="editEmail" placeholder="you@example.com">
+              </div>
+              <div class="col-md-6">
+                <label class="flabel">Role</label>
+                <select class="fc" id="editRole">
+                  <option value="Admin">Admin</option>
+                  <option value="Manager">Manager</option>
+                  <option value="Staff">Staff</option>
+                  <option value="Kitchen">Kitchen</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="flabel">Bio</label>
+                <textarea class="fc" id="editBio" rows="2" placeholder="Short bio…" style="resize:vertical"></textarea>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:14px">
+              <button class="btn-p" onclick="saveProfile()">💾 Save Profile</button>
+              <button class="btn-g"  onclick="loadProfile()">↺ Reset</button>
+            </div>
+          </div>
+
+          <!-- Change Password -->
+          <div class="card-c mb-4">
+            <div class="card-title mb-3">🔐 Change Password</div>
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="flabel">New Password</label>
+                <input type="password" class="fc" id="newPass" placeholder="Min. 6 characters">
+              </div>
+              <div class="col-md-6">
+                <label class="flabel">Confirm Password</label>
+                <input type="password" class="fc" id="confPass" placeholder="Repeat password">
+              </div>
+            </div>
+            <button class="btn-g" style="margin-top:12px" onclick="changePassword()">🔑 Update Password</button>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="card-c mb-4">
+            <div class="card-title mb-3">📋 My Recent Activity</div>
+            <div id="myActivity">
+              <div class="empty-st"><div class="ei">📋</div><div class="et">Loading…</div></div>
+            </div>
+          </div>
+
+          <!-- Danger Zone -->
+          <div style="border:1px solid var(--red);border-radius:var(--radius);padding:18px">
+            <div style="font-family:var(--font-d);font-size:15px;font-weight:600;color:var(--red);margin-bottom:8px">⚠️ Danger Zone</div>
+            <p style="color:var(--text-3);font-size:13px;margin-bottom:14px">These actions are permanent and cannot be undone.</p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn-d" onclick="resetDashboard()">🗑️ Reset Dashboard Layout</button>
+              <button class="btn-d" onclick="doSignOut()">🚪 Sign Out</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let currentUser, userPrefs = {}, pendingLogo = null;
+
+requireAuth(async user => {
+  currentUser = user;
+  buildSidebar(user.uid);
+  buildTopbar('Profile', 'Account settings & branding');
+  loadSidebarUser(user);
+  await loadProfile();
+  loadStats();
+  loadActivity();
+  Loader.hide();
+});
+
+/* ── Load Profile ─────────────────────────────────────── */
+async function loadProfile() {
+  try {
+    const doc  = await db.collection(C.USERS).doc(currentUser.uid).get();
+    const data = doc.data() || {};
+
+    document.getElementById('editName').value   = data.displayName   || currentUser.displayName || '';
+    document.getElementById('editEmail').value  = data.email         || currentUser.email       || '';
+    document.getElementById('editPhone').value  = data.phone         || '';
+    document.getElementById('editRole').value   = data.role          || 'Staff';
+    document.getElementById('editBio').value    = data.bio           || '';
+    document.getElementById('restName').value   = data.restaurantName|| '';
+    document.getElementById('restTagline').value= data.restTagline   || '';
+
+    document.getElementById('pName').textContent  = data.displayName || currentUser.displayName || 'User';
+    document.getElementById('pEmail').textContent = data.email || currentUser.email;
+    document.getElementById('pRole').innerHTML    = statusChip(data.role || 'Staff');
+
+    // Avatar
+    const av = document.getElementById('profileAv');
+    if (data.photoURL) av.innerHTML = `<img src="${data.photoURL}" style="width:100%;height:100%;object-fit:cover">`;
+    else av.textContent = (data.displayName || currentUser.email || '?').charAt(0).toUpperCase();
+
+    // Logo
+    if (data.logoURL) {
+      document.getElementById('logoPreviewWrap').innerHTML =
+        `<img src="${data.logoURL}" style="width:100%;height:100%;object-fit:cover">`;
+    }
+
+    // Preferences
+    userPrefs = data.preferences || {};
+    applyPrefsUI(userPrefs);
+
+  } catch (e) { Toast.error('Load failed: ' + e.message); }
+}
+
+function applyPrefsUI(prefs) {
+  const theme = prefs.theme || localStorage.getItem('rms_theme') || 'dark';
+  document.getElementById('swDark').classList.toggle('on', theme === 'dark');
+  document.getElementById('swSound').classList.toggle('on', !!prefs.sound);
+
+  const curSel = document.getElementById('currencySel');
+  const currency = prefs.currency || '₨';
+  if (curSel) curSel.value = currency;
+  localStorage.setItem('rms_currency', currency);
+
+  const taxInp = document.getElementById('taxRateInp');
+  if (taxInp) taxInp.value = prefs.taxRate != null ? prefs.taxRate : '8';
+
+  ThemeManager.load(theme);
+}
+
+/* ── Preferences ─────────────────────────────────────── */
+async function togglePref(key, el) {
+  el.classList.toggle('on');
+  const on = el.classList.contains('on');
+  if (key === 'dark') {
+    ThemeManager.set(on ? 'dark' : 'light');
+    userPrefs.theme = on ? 'dark' : 'light';
+  } else {
+    userPrefs[key] = on;
+  }
+  await flushPrefs();
+}
+
+async function savePref(key, value) {
+  userPrefs[key] = value;
+  if (key === 'currency') localStorage.setItem('rms_currency', value);
+  if (key === 'taxRate')  localStorage.setItem('rms_taxrate',  value);
+  await flushPrefs();
+}
+
+async function flushPrefs() {
+  try {
+    await db.collection(C.USERS).doc(currentUser.uid).update({
+      preferences: userPrefs,
+      updatedAt:   firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch {}
+}
+
+/* ── Branding ────────────────────────────────────────── */
+function handleLogoSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { Toast.warning('Logo must be under 5MB.'); return; }
+  pendingLogo = file;
+  const r = new FileReader();
+  r.onload = e => {
+    document.getElementById('logoPreviewWrap').innerHTML =
+      `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+  };
+  r.readAsDataURL(file);
+}
+
+async function saveBranding() {
+  const name     = document.getElementById('restName').value.trim();
+  const tagline  = document.getElementById('restTagline').value.trim();
+  const statusEl = document.getElementById('brandingStatus');
+  statusEl.textContent = 'Saving…';
+
+  try {
+    let logoURL = null;
+
+    if (pendingLogo) {
+      // Compress & store in Firestore images collection (free, no external service)
+      const imageId = await ImageService.uploadLogo(pendingLogo, currentUser.uid);
+      logoURL = await ImageService.get(imageId);
+      pendingLogo = null;
+    } else {
+      // Keep existing logo
+      const doc = await db.collection(C.USERS).doc(currentUser.uid).get();
+      logoURL = doc.data()?.logoURL || null;
+    }
+
+    await db.collection(C.USERS).doc(currentUser.uid).update({
+      restaurantName: name, restTagline: tagline,
+      logoURL, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Update localStorage so sidebar & login reflect immediately
+    if (name)    localStorage.setItem('rms_rname', name);
+    if (logoURL) localStorage.setItem('rms_logo',  logoURL);
+
+    // Update sidebar brand live
+    const brandEl = document.querySelector('.brand-name');
+    const logoEl  = document.querySelector('.brand-logo');
+    if (brandEl) brandEl.textContent = name || 'Restaurant Pro';
+    if (logoEl)  logoEl.innerHTML    = logoURL ? `<img src="${logoURL}" alt="logo">` : '🍽️';
+
+    Toast.success('Branding saved!');
+    statusEl.textContent = '✅ Saved';
+    await logActivity('profile_updated', { field: 'branding' });
+  } catch (e) {
+    Toast.error('Failed: ' + e.message);
+    statusEl.textContent = '❌ Error';
+  }
+}
+
+async function removeLogo() {
+  document.getElementById('logoPreviewWrap').innerHTML = '🍽️';
+  localStorage.removeItem('rms_logo');
+  pendingLogo = null;
+  try {
+    await db.collection(C.USERS).doc(currentUser.uid).update({ logoURL: null });
+    const logoEl = document.querySelector('.brand-logo');
+    if (logoEl) logoEl.innerHTML = '🍽️';
+    Toast.success('Logo removed.');
+  } catch {}
+}
+
+/* ── Save Profile ────────────────────────────────────── */
+async function saveProfile() {
+  const name  = document.getElementById('editName').value.trim();
+  const email = document.getElementById('editEmail').value.trim();
+  const phone = document.getElementById('editPhone').value.trim();
+  const role  = document.getElementById('editRole').value;
+  const bio   = document.getElementById('editBio').value.trim();
+
+  if (!name)  { Toast.warning('Name is required.'); return; }
+  if (!email) { Toast.warning('Email is required.'); return; }
+
+  try {
+    await currentUser.updateProfile({ displayName: name });
+    if (email !== currentUser.email) await currentUser.updateEmail(email);
+
+    await db.collection(C.USERS).doc(currentUser.uid).update({
+      displayName: name, email, phone, role, bio,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    document.getElementById('pName').textContent  = name;
+    document.getElementById('pEmail').textContent = email;
+    document.getElementById('pRole').innerHTML    = statusChip(role);
+    loadSidebarUser(currentUser);
+
+    await logActivity('profile_updated', { name, role });
+    Toast.success('Profile saved!');
+  } catch (e) {
+    const msgs = {
+      'auth/requires-recent-login': 'Sign out and back in to change email.',
+      'auth/email-already-in-use':  'Email already in use.',
+    };
+    Toast.error(msgs[e.code] || e.message);
+  }
+}
+
+/* ── Avatar Upload ───────────────────────────────────── */
+async function uploadAvatar(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { Toast.warning('Max 5MB.'); return; }
+
+  const av = document.getElementById('profileAv');
+  av.innerHTML = `<div class="spinner" style="width:36px;height:36px;margin:auto"></div>`;
+
+  try {
+    let photoURL;
+    {
+      // Compress & store in Firestore, then read back as base64 data URL
+      const imageId = await ImageService.uploadAvatar(file, currentUser.uid);
+      photoURL = await ImageService.get(imageId);
+    }
+
+    await currentUser.updateProfile({ photoURL });
+    await db.collection(C.USERS).doc(currentUser.uid).update({ photoURL });
+
+    av.innerHTML = `<img src="${photoURL}" style="width:100%;height:100%;object-fit:cover">`;
+    const sbAv = document.getElementById('sidebarAv');
+    if (sbAv) sbAv.innerHTML = `<img src="${photoURL}" alt="">`;
+    Toast.success('Avatar updated!');
+  } catch (e) {
+    av.textContent = (currentUser.displayName || '?').charAt(0).toUpperCase();
+    Toast.error('Upload failed: ' + e.message);
+  }
+}
+
+/* ── Password ────────────────────────────────────────── */
+async function changePassword() {
+  const np = document.getElementById('newPass').value;
+  const cp = document.getElementById('confPass').value;
+  if (!np)        { Toast.warning('Enter a new password.'); return; }
+  if (np.length < 6) { Toast.warning('Min 6 characters.'); return; }
+  if (np !== cp)  { Toast.warning('Passwords do not match.'); return; }
+  try {
+    await currentUser.updatePassword(np);
+    document.getElementById('newPass').value  = '';
+    document.getElementById('confPass').value = '';
+    Toast.success('Password updated!');
+  } catch (e) {
+    const msgs = { 'auth/requires-recent-login': 'Sign out and back in first.', 'auth/weak-password': 'Password too weak.' };
+    Toast.error(msgs[e.code] || e.message);
+  }
+}
+
+/* ── Stats ───────────────────────────────────────────── */
+async function loadStats() {
+  try {
+    const [oSnap, aSnap] = await Promise.all([
+      db.collection(C.ORDERS).where('createdBy','==',currentUser.uid).get(),
+      db.collection(C.ACTIVITY).where('uid','==',currentUser.uid).get(),
+    ]);
+    document.getElementById('myOrdCnt').textContent = oSnap.size;
+    document.getElementById('myActCnt').textContent = aSnap.size;
+  } catch {}
+}
+
+/* ── Activity ────────────────────────────────────────── */
+async function loadActivity() {
+  try {
+    const snap = await db.collection(C.ACTIVITY)
+      .where('uid','==',currentUser.uid)
+      .orderBy('createdAt','desc')
+      .limit(8)
+      .get();
+
+    const cont = document.getElementById('myActivity');
+    if (snap.empty) {
+      cont.innerHTML = `<div class="empty-st"><div class="ei">📋</div><div class="et">No activity yet</div></div>`;
+      return;
+    }
+    const labels = {
+      order_placed:'Order Placed', order_advanced:'Order Advanced',
+      bill_paid:'Bill Paid', table_added:'Table Added', table_deleted:'Table Deleted',
+      menu_item_added:'Item Added', menu_item_deleted:'Item Deleted',
+      layout_saved:'Layout Saved', profile_updated:'Profile Updated',
+    };
+    let html = '';
+    snap.docs.forEach(doc => {
+      const d = doc.data();
+      html += `<div class="tl-item">
+        <div class="tl-dot" style="background:var(--accent)"></div>
+        <div style="flex:1">
+          <div class="tl-text">${labels[d.action] || d.action}</div>
+          <div class="tl-time">${fmt.datetime(d.createdAt)}</div>
+        </div>
+      </div>`;
+    });
+    cont.innerHTML = html;
+  } catch {}
+}
+
+/* ── Danger ──────────────────────────────────────────── */
+async function resetDashboard() {
+  if (!confirm('Reset your dashboard to the default layout?')) return;
+  try {
+    await db.collection(C.LAYOUTS).doc(currentUser.uid).delete();
+    Toast.success('Dashboard layout reset!');
+  } catch (e) { Toast.error(e.message); }
+}
+
+function doSignOut() {
+  if (!confirm('Sign out of Restaurant Pro?')) return;
+  auth.signOut().then(() => location.href = 'index.html');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restaurant Pro — History</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    .htab { padding:7px 18px;border-radius:999px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-2);font-size:13px;font-weight:500;cursor:pointer;transition:var(--transition); }
+    .htab.active { background:var(--accent);color:#000;border-color:var(--accent);font-weight:600; }
+    .hpane { display:none; animation:fadeIn .25s ease; }
+    .hpane.active { display:block; }
+    .bar-wrap { display:flex; align-items:flex-end; gap:3px; height:70px; }
+    .bar { flex:1; border-radius:4px 4px 0 0; background:var(--accent); opacity:.7; transition:var(--transition); min-width:8px; }
+    .bar:hover { opacity:1; }
+  </style>
+</head>
+<body>
+<div class="page-loader" id="pageLoader"><div style="text-align:center"><div class="spinner" style="margin:0 auto 14px"></div></div></div>
+<div class="app-shell">
+  <nav class="sidebar" id="appSidebar"></nav>
+  <div class="main-area">
+    <div class="topbar" id="appTopbar"></div>
+    <div class="page-content fade-in">
+
+      <div class="section-hdr mb-4">
+        <div><h2 class="section-title">History &amp; Analytics</h2></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input type="date" class="fc" id="dfrom" style="max-width:150px">
+          <input type="date" class="fc" id="dto"   style="max-width:150px">
+          <button class="btn-p btn-sm" onclick="applyDates()">Apply</button>
+          <button class="btn-g btn-sm" onclick="clearDates()">Clear</button>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon" style="background:var(--accent-soft)">💰</div><div class="stat-val" id="sRevenue">—</div><div class="stat-lbl">Total Revenue</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon" style="background:var(--blue-s)">🛒</div><div class="stat-val" id="sOrders">—</div><div class="stat-lbl">Total Orders</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon" style="background:var(--green-s)">💳</div><div class="stat-val" id="sBills">—</div><div class="stat-lbl">Bills Issued</div></div></div>
+        <div class="col-6 col-md-3"><div class="stat-card"><div class="stat-icon" style="background:var(--purple-s)">📊</div><div class="stat-val" id="sAvg">—</div><div class="stat-lbl">Avg Order</div></div></div>
+      </div>
+
+      <!-- Breakdown Cards -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <div class="card-c" style="height:100%">
+            <div class="card-title mb-3">💳 Payment Methods</div>
+            <div id="pmBreakdown"><div style="color:var(--text-3);font-size:13px">Loading…</div></div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card-c" style="height:100%">
+            <div class="card-title mb-3">🛒 Order Types</div>
+            <div id="otBreakdown"><div style="color:var(--text-3);font-size:13px">Loading…</div></div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card-c" style="height:100%">
+            <div class="card-title mb-3">🍕 Top Items</div>
+            <div id="topItems"><div style="color:var(--text-3);font-size:13px">Loading…</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 7-day Revenue Chart -->
+      <div class="card-c mb-4">
+        <div class="section-hdr">
+          <div class="card-title">📈 Revenue (Last 7 Days)</div>
+          <div style="font-family:var(--font-m);font-size:16px;font-weight:700;color:var(--accent)" id="chartTotal">—</div>
+        </div>
+        <div id="revenueChart" style="margin-top:14px;display:flex;align-items:flex-end;gap:8px;height:100px"></div>
+      </div>
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+        <button class="htab active" id="htab-o" onclick="switchTab('o',this)">🛒 Orders</button>
+        <button class="htab"        id="htab-b" onclick="switchTab('b',this)">💳 Payments</button>
+        <button class="htab"        id="htab-a" onclick="switchTab('a',this)">📋 Activity</button>
+      </div>
+
+      <!-- Orders Tab -->
+      <div class="hpane active" id="hpane-o">
+        <div class="card-c" style="padding:0;overflow:hidden">
+          <div style="padding:11px 18px;border-bottom:1px solid var(--border);background:var(--bg-tertiary);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <span class="card-title">All Orders</span>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <input type="text" class="fc" id="oSearch" placeholder="🔍 Search…" style="max-width:180px" oninput="filterO()">
+              <select class="fc" id="oStatusF" style="max-width:130px" onchange="filterO()">
+                <option value="">All Status</option>
+                <option>Pending</option><option>Cooking</option><option>Ready</option>
+                <option>Served</option><option>Paid</option><option>Cancelled</option>
+              </select>
+              <button class="btn-g" onclick="exportOrders()">📥 CSV</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="tbl">
+              <thead><tr><th>Order #</th><th>Type</th><th>Table</th><th>Items</th><th>Total</th><th>Status</th><th>Date</th></tr></thead>
+              <tbody id="oTbody"><tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:28px">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bills Tab -->
+      <div class="hpane" id="hpane-b">
+        <div class="card-c" style="padding:0;overflow:hidden">
+          <div style="padding:11px 18px;border-bottom:1px solid var(--border);background:var(--bg-tertiary);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+            <span class="card-title">Payment History</span>
+            <div style="display:flex;gap:8px">
+              <select class="fc" id="bMethodF" style="max-width:140px" onchange="filterB()">
+                <option value="">All Methods</option>
+                <option>Cash</option><option>Card</option><option>UPI</option><option>Wallet</option>
+              </select>
+              <button class="btn-g" onclick="exportBills()">📥 CSV</button>
+            </div>
+          </div>
+          <div style="overflow-x:auto">
+            <table class="tbl">
+              <thead><tr><th>Order #</th><th>Subtotal</th><th>Tax</th><th>Discount</th><th>Total</th><th>Method</th><th>Date</th></tr></thead>
+              <tbody id="bTbody"><tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:28px">Loading…</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Activity Tab -->
+      <div class="hpane" id="hpane-a">
+        <div class="card-c">
+          <div class="section-hdr mb-3">
+            <span class="card-title">Activity Log</span>
+            <input type="text" class="fc" id="aSearch" placeholder="🔍 Filter…" style="max-width:200px" oninput="filterA()">
+          </div>
+          <div id="aTl"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let allOrders = [], allBills = [], allActivity = [];
+let fOrders   = [], fBills   = [], fActivity   = [];
+
+requireAuth(user => {
+  buildSidebar(user.uid);
+  buildTopbar('History', 'Analytics & records');
+  loadSidebarUser(user);
+
+  // Default date: last 30 days
+  const today = new Date();
+  const ago30 = new Date(today); ago30.setDate(ago30.getDate() - 30);
+  document.getElementById('dfrom').value = ago30.toISOString().slice(0,10);
+  document.getElementById('dto').value   = today.toISOString().slice(0,10);
+
+  loadAll();
+  Loader.hide();
+});
+
+function switchTab(tab, btn) {
+  ['o','b','a'].forEach(t => {
+    document.getElementById('hpane-' + t).classList.toggle('active', t === tab);
+    document.getElementById('htab-'  + t).classList.toggle('active', t === tab);
+  });
+}
+
+async function loadAll() {
+  const [oSnap, bSnap, aSnap] = await Promise.all([
+    db.collection(C.ORDERS).orderBy('createdAt','desc').limit(500).get(),
+    db.collection(C.BILLS).orderBy('createdAt','desc').limit(500).get(),
+    db.collection(C.ACTIVITY).orderBy('createdAt','desc').limit(200).get(),
+  ]);
+  allOrders   = oSnap.docs.map(d => ({id:d.id,...d.data()}));
+  allBills    = bSnap.docs.map(d => ({id:d.id,...d.data()}));
+  allActivity = aSnap.docs.map(d => ({id:d.id,...d.data()}));
+  applyDates();
+}
+
+function applyDates() {
+  const fv = document.getElementById('dfrom').value;
+  const tv = document.getElementById('dto').value;
+  const from = fv ? new Date(fv + 'T00:00:00') : null;
+  const to   = tv ? new Date(tv + 'T23:59:59') : null;
+  const filter = (arr) => arr.filter(x => {
+    const d = x.createdAt?.toDate ? x.createdAt.toDate() : null;
+    if (!d) return true;
+    if (from && d < from) return false;
+    if (to   && d > to)   return false;
+    return true;
+  });
+  fOrders   = filter(allOrders);
+  fBills    = filter(allBills);
+  fActivity = filter(allActivity);
+  updateStats();
+  updateBreakdowns();
+  updateChart();
+  filterO(); filterB(); filterA();
+}
+
+function clearDates() {
+  document.getElementById('dfrom').value = '';
+  document.getElementById('dto').value   = '';
+  fOrders   = [...allOrders];
+  fBills    = [...allBills];
+  fActivity = [...allActivity];
+  updateStats();
+  updateBreakdowns();
+  updateChart();
+  filterO(); filterB(); filterA();
+}
+
+function updateStats() {
+  const sym     = localStorage.getItem('rms_currency') || '₨';
+  const paid    = fBills.filter(b => b.status === 'Paid');
+  const revenue = paid.reduce((s,b) => s+(b.total||0), 0);
+  const avg     = paid.length ? revenue/paid.length : 0;
+  document.getElementById('sRevenue').textContent = sym + Math.round(revenue).toLocaleString();
+  document.getElementById('sOrders').textContent  = fOrders.length;
+  document.getElementById('sBills').textContent   = fBills.length;
+  document.getElementById('sAvg').textContent     = sym + avg.toFixed(2);
+}
+
+function barChart(cont, data) {
+  const max = Math.max(...data.map(d => d.v), 1);
+  cont.innerHTML = data.map(d => {
+    const h = Math.max(4, Math.round((d.v/max)*80));
+    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0">
+      <div style="font-family:var(--font-m);font-size:9px;color:var(--text-3)">${d.v>0?Math.round(d.v):''}</div>
+      <div style="height:${h}px;width:100%;background:var(--accent);opacity:.75;border-radius:4px 4px 0 0;transition:height .3s" title="${d.label}: ${d.v}"></div>
+      <div style="font-size:9px;color:var(--text-3);white-space:nowrap">${d.label}</div>
+    </div>`;
+  }).join('');
+}
+
+function updateChart() {
+  const sym  = localStorage.getItem('rms_currency') || '₨';
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    days.push({ date: d.toDateString(), label: d.toLocaleDateString('en',{weekday:'short'}) });
+  }
+  const data = days.map(day => {
+    const v = allBills
+      .filter(b => b.status==='Paid' && b.createdAt?.toDate && b.createdAt.toDate().toDateString()===day.date)
+      .reduce((s,b) => s+(b.total||0), 0);
+    return { label: day.label, v };
+  });
+  const total7d = data.reduce((s,d) => s+d.v, 0);
+  document.getElementById('chartTotal').textContent = sym + Math.round(total7d).toLocaleString();
+  barChart(document.getElementById('revenueChart'), data);
+}
+
+function makeBar(label, val, maxVal, color) {
+  const pct = maxVal > 0 ? (val/maxVal*100).toFixed(1) : 0;
+  return `<div style="margin-bottom:12px">
+    <div style="display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:3px">
+      <span>${label}</span><span class="mono" style="color:${color}">${val}</span>
+    </div>
+    <div style="height:5px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden">
+      <div style="height:100%;background:${color};width:${pct}%;border-radius:3px;transition:width .5s"></div>
+    </div>
+  </div>`;
+}
+
+function updateBreakdowns() {
+  const sym = localStorage.getItem('rms_currency') || '₨';
+
+  // Payment methods
+  const pm = {};
+  fBills.forEach(b => { const m=b.paymentMethod||'Unknown'; pm[m]=(pm[m]||0)+(b.total||0); });
+  const pmMax = Math.max(...Object.values(pm), 1);
+  document.getElementById('pmBreakdown').innerHTML = Object.entries(pm)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([k,v]) => makeBar(k, sym+v.toFixed(0), pmMax, 'var(--accent)'))
+    .join('') || `<div style="color:var(--text-3);font-size:13px">No data</div>`;
+
+  // Order types
+  const ot = {};
+  fOrders.forEach(o => { const t=o.type||'Unknown'; ot[t]=(ot[t]||0)+1; });
+  const otMax = Math.max(...Object.values(ot), 1);
+  document.getElementById('otBreakdown').innerHTML = Object.entries(ot)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([k,v]) => makeBar(k, v+' orders', otMax, 'var(--blue)'))
+    .join('') || `<div style="color:var(--text-3);font-size:13px">No data</div>`;
+
+  // Top items
+  const ti = {};
+  fOrders.forEach(o => (o.items||[]).forEach(i => { ti[i.name]=(ti[i.name]||0)+i.qty; }));
+  const tiMax = Math.max(...Object.values(ti), 1);
+  document.getElementById('topItems').innerHTML = Object.entries(ti)
+    .sort((a,b)=>b[1]-a[1]).slice(0,6)
+    .map(([k,v]) => makeBar(k, v+'×', tiMax, 'var(--purple)'))
+    .join('') || `<div style="color:var(--text-3);font-size:13px">No data</div>`;
+}
+
+/* ── Orders Tab ──────────────────────────────────────── */
+function filterO() {
+  const q  = (document.getElementById('oSearch')?.value||'').toLowerCase();
+  const st = document.getElementById('oStatusF')?.value||'';
+  let orders = [...fOrders];
+  if (st) orders = orders.filter(o => o.status === st);
+  if (q)  orders = orders.filter(o =>
+    String(o.orderNumber||'').includes(q) ||
+    String(o.tableNumber||'').includes(q) ||
+    (o.customerName||'').toLowerCase().includes(q)
+  );
+  const sym = localStorage.getItem('rms_currency')||'₨';
+  const tb  = document.getElementById('oTbody');
+  if (!orders.length) { tb.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:28px">No orders found</td></tr>`; return; }
+  tb.innerHTML = orders.slice(0,100).map(o => `
+    <tr>
+      <td><span class="order-num-badge" style="width:32px;height:32px;font-size:13px">${o.orderNumber||'?'}</span></td>
+      <td>${statusChip(o.type||'—')}</td>
+      <td>${o.tableNumber ? '#'+o.tableNumber : '<span style="color:var(--text-3)">—</span>'}</td>
+      <td style="color:var(--text-3)">${(o.items||[]).reduce((s,i)=>s+i.qty,0)} items</td>
+      <td class="mono" style="color:var(--accent);font-weight:600">${sym}${(o.total||0).toFixed(2)}</td>
+      <td>${statusChip(o.status||'—')}</td>
+      <td style="color:var(--text-3);font-size:12px">${fmt.datetime(o.createdAt)}</td>
+    </tr>`).join('');
+  if (orders.length>100) tb.innerHTML += `<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:10px;font-size:12px">Showing first 100 of ${orders.length}</td></tr>`;
+}
+
+/* ── Bills Tab ───────────────────────────────────────── */
+function filterB() {
+  const m   = document.getElementById('bMethodF')?.value||'';
+  let bills = m ? fBills.filter(b => b.paymentMethod===m) : [...fBills];
+  const sym = localStorage.getItem('rms_currency')||'₨';
+  const tb  = document.getElementById('bTbody');
+  if (!bills.length) { tb.innerHTML=`<tr><td colspan="7" style="text-align:center;color:var(--text-3);padding:28px">No bills found</td></tr>`; return; }
+  tb.innerHTML = bills.slice(0,100).map(b => `
+    <tr>
+      <td><span class="order-num-badge" style="width:32px;height:32px;font-size:13px">${b.orderNumber||'?'}</span></td>
+      <td class="mono">${sym}${(b.subtotal||0).toFixed(2)}</td>
+      <td class="mono">${sym}${(b.tax||0).toFixed(2)}</td>
+      <td class="mono" style="color:var(--green)">${(b.discount||0)>0?'-'+sym+(b.discount||0).toFixed(2):'—'}</td>
+      <td class="mono" style="color:var(--accent);font-weight:700">${sym}${(b.total||0).toFixed(2)}</td>
+      <td><span class="chip ch-blue">${b.paymentMethod||'—'}</span></td>
+      <td style="color:var(--text-3);font-size:12px">${fmt.datetime(b.createdAt)}</td>
+    </tr>`).join('');
+}
+
+/* ── Activity Tab ────────────────────────────────────── */
+function filterA() {
+  const q   = (document.getElementById('aSearch')?.value||'').toLowerCase();
+  let acts  = q ? fActivity.filter(a => (a.action||'').includes(q) || JSON.stringify(a.details||{}).toLowerCase().includes(q)) : [...fActivity];
+  const tl  = document.getElementById('aTl');
+  const AL  = {order_placed:'Order Placed',order_advanced:'Order Advanced',bill_paid:'Bill Paid',
+               table_added:'Table Added',table_deleted:'Table Deleted',table_status_changed:'Table Status',
+               menu_item_added:'Item Added',menu_item_deleted:'Item Deleted',layout_saved:'Layout Saved',profile_updated:'Profile Updated'};
+  const AC  = {order_placed:'var(--green)',order_advanced:'var(--blue)',bill_paid:'var(--accent)',
+               table_added:'var(--purple)',table_deleted:'var(--red)',profile_updated:'var(--teal)'};
+  if (!acts.length) { tl.innerHTML=`<div class="empty-st"><div class="ei">📋</div><div class="et">No activity</div></div>`; return; }
+  tl.innerHTML = acts.slice(0,80).map(a => {
+    const lbl   = AL[a.action] || a.action;
+    const color = AC[a.action] || 'var(--text-3)';
+    const dets  = Object.entries(a.details||{}).filter(([k])=>k!=='uid')
+      .map(([k,v])=>`<span class="mono" style="font-size:10px;color:var(--text-3)">${k}:${v}</span>`).join(' ');
+    return `<div class="tl-item">
+      <div class="tl-dot" style="background:${color}"></div>
+      <div style="flex:1">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap">
+          <div>
+            <div class="tl-text" style="font-weight:600">${lbl}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:2px">${dets}</div>
+          </div>
+          <div class="tl-time">${fmt.datetime(a.createdAt)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function exportOrders() {
+  const rows = [['Order #','Type','Table','Items','Subtotal','Tax','Total','Status','Date']];
+  fOrders.forEach(o => rows.push([
+    o.orderNumber||0, o.type, o.tableNumber||'',
+    (o.items||[]).reduce((s,i)=>s+i.qty,0),
+    (o.subtotal||0).toFixed(2),(o.tax||0).toFixed(2),(o.total||0).toFixed(2),
+    o.status, fmt.datetime(o.createdAt)
+  ]));
+  downloadCSV(rows, 'orders.csv');
+}
+function exportBills() {
+  const rows = [['Order #','Subtotal','Tax','Discount','Total','Method','Date']];
+  fBills.forEach(b => rows.push([
+    b.orderNumber||0,(b.subtotal||0).toFixed(2),(b.tax||0).toFixed(2),
+    (b.discount||0).toFixed(2),(b.total||0).toFixed(2),b.paymentMethod,fmt.datetime(b.createdAt)
+  ]));
+  downloadCSV(rows, 'bills.csv');
+}
+</script>
+</body>
+</html>

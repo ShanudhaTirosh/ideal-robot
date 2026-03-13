@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restaurant Pro — Billing</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    /* Dedicated print zone: hidden normally, shown only when printing */
+    #print-zone { display:none }
+    @media print {
+      body > *    { display:none !important }
+      #print-zone { display:block !important; width:80mm; margin:0 auto }
+      .receipt-paper { border:none }
+    }
+  </style>
+</head>
+<body>
+
+<!-- PRINT ZONE — completely outside modal/app-shell to prevent duplication -->
+<div id="print-zone">
+  <div class="receipt-paper" id="receiptContent"></div>
+</div>
+
+<div class="page-loader" id="pageLoader">
+  <div style="text-align:center"><div class="spinner" style="margin:0 auto 14px"></div></div>
+</div>
+
+<div class="app-shell">
+  <nav class="sidebar" id="appSidebar"></nav>
+  <div class="main-area">
+    <div class="topbar" id="appTopbar"></div>
+    <div class="page-content fade-in">
+
+      <div class="section-hdr mb-4">
+        <div><h2 class="section-title">Billing</h2>
+          <p class="text-m" style="font-size:13px;margin:0">Generate bills and process payments</p></div>
+      </div>
+
+      <div class="row g-4">
+        <!-- Served Orders -->
+        <div class="col-lg-5">
+          <div class="card-c" style="padding:0;overflow:hidden">
+            <div style="padding:12px 18px;border-bottom:1px solid var(--border);background:var(--bg-tertiary)">
+              <div class="card-title">Ready to Bill</div>
+              <div class="card-sub">Served orders awaiting payment</div>
+            </div>
+            <div style="overflow-y:auto;max-height:68vh" id="servedList"></div>
+          </div>
+        </div>
+        <!-- Bill Preview -->
+        <div class="col-lg-7">
+          <div class="card-c" style="padding:0;overflow:hidden">
+            <div style="padding:12px 18px;border-bottom:1px solid var(--border);background:var(--bg-tertiary)">
+              <div class="card-title">Bill Preview</div>
+              <div class="card-sub">Review and process payment</div>
+            </div>
+            <div style="padding:20px" id="billPreview">
+              <div class="empty-st" style="padding:40px"><div class="ei">💳</div><div class="et">Select an order</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="card-c mt-4" style="padding:0;overflow:hidden">
+        <div style="padding:12px 18px;border-bottom:1px solid var(--border);background:var(--bg-tertiary);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <span class="card-title">Bill History</span>
+          <div style="display:flex;gap:8px">
+            <input type="text" class="fc" id="bSearch" placeholder="🔍 Search…" style="max-width:180px" oninput="filterHistory()">
+            <button class="btn-g" onclick="exportBills()">📥 CSV</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table class="tbl">
+            <thead><tr><th>Order #</th><th>Type</th><th>Subtotal</th><th>Tax</th><th>Discount</th><th>Total</th><th>Method</th><th>Date</th><th></th></tr></thead>
+            <tbody id="billHistBody"><tr><td colspan="9" style="text-align:center;color:var(--text-3);padding:28px">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Receipt Modal — for PREVIEW only, NOT printed from here -->
+<div class="modal modal-c fade" id="receiptModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">🧾 Receipt Preview</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" style="background:#eee;padding:12px">
+        <div id="previewInner"></div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-g" data-bs-dismiss="modal">Close</button>
+        <button class="btn-p" onclick="doPrint()">🖨️ Print</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm -->
+<div class="modal modal-c fade" id="confirmModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-body" style="padding:26px;text-align:center">
+        <div style="font-size:34px;margin-bottom:12px">⚠️</div>
+        <div id="confirmMsg" style="font-size:13.5px;color:var(--text-2);margin-bottom:20px"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-g" id="confirmCancelBtn" data-bs-dismiss="modal" style="flex:1">Cancel</button>
+          <button class="btn-d" id="confirmOkBtn" style="flex:1">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let servedOrders = [], allBills = [];
+let selOrder = null, selPM = 'Cash';
+let receiptModal;
+
+requireAuth(user => {
+  buildSidebar(user.uid);
+  buildTopbar('Billing', 'Generate bills & receipts');
+  loadSidebarUser(user);
+  receiptModal = new bootstrap.Modal(document.getElementById('receiptModal'));
+  subServed();
+  subBills();
+  Loader.hide();
+  const op = new URLSearchParams(location.search).get('order');
+  if (op) setTimeout(() => selectOrder(op), 1100);
+});
+
+function subServed() {
+  db.collection(C.ORDERS).where('status','in',['Served','Paid']).orderBy('createdAt','desc').onSnapshot(s => {
+    servedOrders = s.docs.map(d => ({id:d.id,...d.data()}));
+    renderServedList();
+  }, e => Toast.error(e.message));
+}
+function subBills() {
+  db.collection(C.BILLS).orderBy('createdAt','desc').limit(200).onSnapshot(s => {
+    allBills = s.docs.map(d => ({id:d.id,...d.data()}));
+    filterHistory();
+  }, ()=>{});
+}
+
+function renderServedList() {
+  const sym  = localStorage.getItem('rms_currency') || '₨';
+  const cont = document.getElementById('servedList');
+  const pend = servedOrders.filter(o => o.status === 'Served');
+  if (!pend.length) { cont.innerHTML = `<div class="empty-st" style="padding:32px"><div class="ei">✅</div><div class="et">No pending bills</div></div>`; return; }
+  let html = '';
+  for (const o of pend) {
+    const sel = selOrder?.id === o.id;
+    html += `<div onclick="selectOrder('${o.id}')" style="padding:13px 18px;border-bottom:1px solid var(--border-subtle);cursor:pointer;${sel?'background:var(--accent-soft);border-left:3px solid var(--accent)':''}">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="order-num-badge" style="width:28px;height:28px;font-size:12px">${o.orderNumber||'?'}</span>
+          <div>
+            <div style="font-weight:600;font-size:13px">${escHtml(o.type)}</div>
+            <div style="font-size:11px;color:var(--text-3)">${o.tableNumber?'Table '+o.tableNumber+' · ':''} ${(o.items||[]).reduce((s,i)=>s+i.qty,0)} items</div>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:var(--font-m);font-size:15px;font-weight:700;color:var(--accent)">${sym}${(o.total||0).toFixed(2)}</div>
+          <div style="font-size:10.5px;color:var(--text-3)">${fmt.time(o.createdAt)}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+  cont.innerHTML = html;
+}
+
+function selectOrder(id) {
+  selOrder = servedOrders.find(o => o.id === id);
+  if (!selOrder) return;
+  renderServedList();
+  renderBillPreview(selOrder);
+}
+
+function renderBillPreview(order) {
+  const sym  = localStorage.getItem('rms_currency') || '₨';
+  const taxP = Math.round(getTaxRate() * 100);
+  const body = document.getElementById('billPreview');
+
+  let rows = '';
+  for (const item of (order.items||[])) {
+    rows += `<tr>
+      <td style="padding:8px 12px">${escHtml(item.name)}</td>
+      <td style="padding:8px 12px;text-align:center">${item.qty}</td>
+      <td style="padding:8px 12px;text-align:right;font-family:var(--font-m)">${sym}${(item.price||0).toFixed(2)}</td>
+      <td style="padding:8px 12px;text-align:right;font-family:var(--font-m);font-weight:600">${sym}${((item.price||0)*item.qty).toFixed(2)}</td>
+    </tr>`;
+  }
+
+  const pmBtns = ['Cash','Card','UPI','Wallet'].map(m =>
+    `<button class="otype-btn ${selPM===m?'active':''}" data-pm="${m}" onclick="setPM('${m}',this)">${m}</button>`
+  ).join('');
+
+  body.innerHTML = `
+    <div style="max-width:560px;margin:0 auto">
+      <div style="display:flex;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:11px;color:var(--text-3)">ORDER</div>
+          <div style="font-family:var(--font-d);font-size:24px;font-weight:700">#${String(order.orderNumber||0).padStart(4,'0')}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:12px;color:var(--text-3)">${fmt.datetime(order.createdAt)}</div>
+          ${statusChip(order.type)}
+          ${order.tableNumber ? `<div style="font-size:12px;margin-top:3px">Table #${order.tableNumber}</div>` : ''}
+        </div>
+      </div>
+
+      <div style="background:var(--bg-tertiary);border-radius:var(--radius-sm);overflow:hidden;margin-bottom:14px">
+        <table style="width:100%;border-collapse:collapse">
+          <thead><tr style="border-bottom:1px solid var(--border)">
+            <th style="padding:8px 12px;font-size:10.5px;color:var(--text-3);font-weight:700;text-transform:uppercase;text-align:left">Item</th>
+            <th style="padding:8px 12px;font-size:10.5px;color:var(--text-3);font-weight:700;text-transform:uppercase;text-align:center">Qty</th>
+            <th style="padding:8px 12px;font-size:10.5px;color:var(--text-3);font-weight:700;text-transform:uppercase;text-align:right">Price</th>
+            <th style="padding:8px 12px;font-size:10.5px;color:var(--text-3);font-weight:700;text-transform:uppercase;text-align:right">Total</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+
+      <div style="background:var(--bg-tertiary);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px">
+        <div class="total-row"><span>Subtotal</span><span class="mono">${sym}${(order.subtotal||0).toFixed(2)}</span></div>
+        <div class="total-row"><span>Tax (${taxP}%)</span><span class="mono">${sym}${(order.tax||0).toFixed(2)}</span></div>
+        <div style="height:1px;background:var(--border);margin:8px 0"></div>
+        <div class="total-row grand"><span>Total Due</span><span class="mono amt">${sym}${(order.total||0).toFixed(2)}</span></div>
+      </div>
+
+      <div style="background:var(--bg-tertiary);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px">
+        <div class="flabel" style="margin-bottom:8px">Payment Method</div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap" id="pmBtns">${pmBtns}</div>
+        <div class="row g-2 mt-2">
+          <div class="col-6">
+            <label class="flabel">Discount (%)</label>
+            <input type="number" class="fc" id="discPct" value="0" min="0" max="100" oninput="updDisc('${order.id}')">
+          </div>
+          <div class="col-6">
+            <label class="flabel">Final Total</label>
+            <div class="fc" id="finalTotal" style="font-family:var(--font-m);font-weight:700;color:var(--accent)">${sym}${(order.total||0).toFixed(2)}</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-p" style="flex:2;justify-content:center;padding:12px" onclick="pay('${order.id}')">✅ Mark Paid &amp; Generate Bill</button>
+        <button class="btn-g" style="flex:1;justify-content:center;padding:12px" onclick="previewReceipt('${order.id}',null)">🧾 Preview</button>
+      </div>
+    </div>`;
+}
+
+function setPM(m, btn) {
+  selPM = m;
+  document.querySelectorAll('#pmBtns [data-pm]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+function updDisc(id) {
+  const o = servedOrders.find(x => x.id === id);
+  if (!o) return;
+  const p = parseFloat(document.getElementById('discPct')?.value) || 0;
+  const f = o.total * (1 - p/100);
+  const el = document.getElementById('finalTotal');
+  const sym = localStorage.getItem('rms_currency') || '₨';
+  if (el) el.textContent = sym + f.toFixed(2);
+}
+
+async function pay(orderId) {
+  const order = servedOrders.find(o => o.id === orderId);
+  if (!order) return;
+  const discPct = parseFloat(document.getElementById('discPct')?.value) || 0;
+  const discAmt = order.total * (discPct/100);
+  const final   = order.total - discAmt;
+
+  try {
+    const ref = await db.collection(C.BILLS).add({
+      orderId, orderNumber: order.orderNumber||null, type: order.type,
+      items: order.items, subtotal: order.subtotal, tax: order.tax,
+      discount: discAmt, discountPct: discPct, total: final,
+      paymentMethod: selPM, status: 'Paid',
+      tableNumber: order.tableNumber||null, customerName: order.customerName||null,
+      createdBy: firebase.auth().currentUser.uid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      paidAt:    firebase.firestore.FieldValue.serverTimestamp(),
+    });
+    await db.collection(C.ORDERS).doc(orderId).update({ status: 'Paid' });
+    await logActivity('bill_paid', { billId: ref.id, orderId, total: final });
+    Toast.success('Bill paid! #' + String(order.orderNumber||0).padStart(4,'0'));
+    selOrder = null;
+    renderServedList();
+    document.getElementById('billPreview').innerHTML = `
+      <div class="empty-st" style="padding:40px"><div class="ei">✅</div><div class="et">Processed!</div>
+        <button class="btn-p" style="margin-top:14px" onclick="previewReceipt('${orderId}','${ref.id}')">🖨️ Print Receipt</button>
+      </div>`;
+  } catch (e) { Toast.error('Failed: ' + e.message); }
+}
+
+/* ── Build receipt HTML string ────────────────────────── */
+function buildReceipt(order, bill) {
+  const src  = bill || order;
+  const sym  = localStorage.getItem('rms_currency') || '₨';
+  const rn   = localStorage.getItem('rms_rname')    || 'Restaurant Pro';
+  const taxP = Math.round(getTaxRate()*100);
+  const on   = '#' + String(src.orderNumber||order?.orderNumber||0).padStart(4,'0');
+
+  let lines = '';
+  for (const item of (src.items||[])) {
+    lines += `<div class="rrow"><span>${escHtml(item.name)} x${item.qty}</span><span>${sym}${((item.price||0)*item.qty).toFixed(2)}</span></div>`;
+  }
+  return `
+    <div class="rh">
+      <div style="font-size:17px;font-weight:700">${escHtml(rn)}</div>
+      <div style="font-size:10px">Order: ${on}</div>
+      ${src.tableNumber ? `<div style="font-size:10px">Table: #${src.tableNumber}</div>` : ''}
+      ${src.customerName ? `<div style="font-size:10px">Customer: ${escHtml(src.customerName)}</div>` : ''}
+      <div style="font-size:10px">${new Date().toLocaleString()}</div>
+    </div>
+    <div style="font-size:10px;text-align:center;margin-bottom:6px">- - - - - - - - - - - - -</div>
+    ${lines}
+    <div class="rtotal">
+      <div class="rrow"><span>Subtotal</span><span>${sym}${(src.subtotal||0).toFixed(2)}</span></div>
+      <div class="rrow"><span>Tax(${taxP}%)</span><span>${sym}${(src.tax||0).toFixed(2)}</span></div>
+      ${(src.discount||0)>0 ? `<div class="rrow"><span>Discount</span><span>-${sym}${(src.discount||0).toFixed(2)}</span></div>` : ''}
+      <div class="rrow bold" style="font-size:14px"><span>TOTAL</span><span>${sym}${(src.total||0).toFixed(2)}</span></div>
+      <div class="rrow"><span>Payment</span><span>${src.paymentMethod||'Cash'}</span></div>
+    </div>
+    <div class="rfooter"><div style="font-weight:700;font-size:13px">THANK YOU! 😊</div><div>Please visit again</div><div style="font-size:9px;opacity:.6">Restaurant Pro</div></div>`;
+}
+
+function previewReceipt(orderId, billId) {
+  const order = servedOrders.find(o => o.id === orderId) || allBills.find(b => b.orderId === orderId);
+  const bill  = billId ? allBills.find(b => b.id === billId) : allBills.find(b => b.orderId === orderId);
+  if (!order && !bill) { Toast.warning('Data not found'); return; }
+  const html = buildReceipt(order||bill, bill);
+  // Populate ONLY the print zone (for window.print)
+  document.getElementById('receiptContent').innerHTML = html;
+  // Show preview inside modal (styled copy)
+  document.getElementById('previewInner').innerHTML = `<div class="receipt-paper">${html}</div>`;
+  receiptModal.show();
+}
+
+function doPrint() {
+  // Close modal first, then print — prevents modal from appearing in print output
+  receiptModal.hide();
+  setTimeout(() => window.print(), 350);
+}
+
+/* ── History ─────────────────────────────────────────── */
+function filterHistory() {
+  const q = (document.getElementById('bSearch')?.value||'').toLowerCase();
+  const bills = q ? allBills.filter(b =>
+    String(b.orderNumber||'').includes(q)||
+    (b.paymentMethod||'').toLowerCase().includes(q)
+  ) : allBills;
+  renderHistory(bills);
+}
+function renderHistory(bills) {
+  const sym = localStorage.getItem('rms_currency')||'₨';
+  const tb  = document.getElementById('billHistBody');
+  if (!bills.length) { tb.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-3);padding:28px">No bills yet</td></tr>`; return; }
+  let html = '';
+  for (const b of bills) {
+    html += `<tr>
+      <td style="font-family:var(--font-m);font-weight:700">#${String(b.orderNumber||0).padStart(4,'0')}</td>
+      <td>${statusChip(b.type||'—')}</td>
+      <td class="mono">${sym}${(b.subtotal||0).toFixed(2)}</td>
+      <td class="mono">${sym}${(b.tax||0).toFixed(2)}</td>
+      <td class="mono" style="color:var(--green)">${(b.discount||0)>0?'-'+sym+(b.discount||0).toFixed(2):'—'}</td>
+      <td class="mono" style="color:var(--accent);font-weight:700">${sym}${(b.total||0).toFixed(2)}</td>
+      <td><span class="chip ch-blue">${b.paymentMethod||'—'}</span></td>
+      <td style="color:var(--text-3);font-size:12px">${fmt.datetime(b.createdAt)}</td>
+      <td><button class="btn-g btn-sm" onclick="previewReceipt('${b.orderId}','${b.id}')">🖨️</button></td>
+    </tr>`;
+  }
+  tb.innerHTML = html;
+}
+function exportBills() {
+  const sym = localStorage.getItem('rms_currency')||'₨';
+  const rows = [['Order #','Type','Subtotal','Tax','Discount','Total','Method','Date']];
+  allBills.forEach(b => rows.push([
+    '#'+String(b.orderNumber||0).padStart(4,'0'),b.type,
+    (b.subtotal||0).toFixed(2),(b.tax||0).toFixed(2),
+    (b.discount||0).toFixed(2),(b.total||0).toFixed(2),
+    b.paymentMethod,fmt.datetime(b.createdAt)
+  ]));
+  downloadCSV(rows,'bills.csv');
+}
+</script>
+</body>
+</html>

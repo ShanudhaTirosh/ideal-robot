@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restaurant Pro — Sign In</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    /* Force full-page centering */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    .auth-wrap {
+      min-height: 100vh;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .feature-list { list-style:none; padding:0; margin:0; }
+    .feature-list li {
+      display:flex; align-items:center; gap:10px;
+      padding:9px 0; border-bottom:1px solid var(--border-subtle);
+      font-size:13.5px; color:var(--text-2);
+    }
+    .feature-list li:last-child { border:none; }
+    .fi { font-size:20px; }
+    .auth-info { flex: 1; }
+    .theme-fab {
+      position: fixed; top:18px; right:18px;
+      width:38px; height:38px; border-radius:50%;
+      border:1px solid var(--border); background:var(--bg-card);
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+      font-size:16px; z-index:100; transition: var(--transition);
+    }
+    .theme-fab:hover { border-color:var(--accent); }
+    .err-msg { color:var(--red); font-size:12.5px; text-align:center; min-height:18px; margin-top:6px; }
+  </style>
+</head>
+<body>
+
+<button class="theme-fab" onclick="ThemeManager.toggle()">
+  <span id="themeIcon">☀️</span>
+</button>
+
+<div class="auth-wrap">
+  <div class="auth-bg"></div>
+  <div class="auth-glow1"></div>
+  <div class="auth-glow2"></div>
+
+  <div class="auth-container">
+
+    <!-- Left info panel -->
+    <div class="auth-info" style="display:none" id="authInfo">
+      <div style="font-family:var(--font-d);font-size:38px;font-weight:700;color:var(--text-1);line-height:1.2;margin-bottom:14px">
+        Complete<br>Restaurant<br><span style="color:var(--accent)">Command Centre</span>
+      </div>
+      <p style="color:var(--text-2);font-size:14px;margin-bottom:24px;line-height:1.7">
+        Manage tables, orders, kitchen, billing and staff from one unified platform. Real-time updates with Firebase.
+      </p>
+      <ul class="feature-list">
+        <li><span class="fi">🪑</span> Dining · Pool Area · Bar · VIP Rooms</li>
+        <li><span class="fi">🛒</span> POS Order System with Live Tracking</li>
+        <li><span class="fi">👨‍🍳</span> Kitchen Display System (KDS)</li>
+        <li><span class="fi">💳</span> Instant Billing &amp; Thermal Receipts</li>
+        <li><span class="fi">📊</span> Revenue Analytics &amp; History</li>
+        <li><span class="fi">🎨</span> Customisable Dashboard Widgets</li>
+      </ul>
+    </div>
+
+    <!-- Auth Card -->
+    <div class="auth-card">
+      <!-- Logo -->
+      <div class="auth-logo" id="authLogo">🍽️</div>
+      <h1 class="auth-title" id="authRestName">Restaurant Pro</h1>
+      <p class="auth-sub">Sign in to your management dashboard</p>
+
+      <!-- Tabs -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="tabLogin"    onclick="switchTab('login')">Sign In</button>
+        <button class="auth-tab"        id="tabRegister" onclick="switchTab('register')">Register</button>
+      </div>
+
+      <!-- LOGIN -->
+      <div class="auth-panel active" id="panelLogin">
+        <div class="mb-3">
+          <label class="flabel">Email Address</label>
+          <input type="email" class="fc" id="lEmail" placeholder="you@restaurant.com" autocomplete="email">
+        </div>
+        <div class="mb-4">
+          <label class="flabel">Password</label>
+          <input type="password" class="fc" id="lPass" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button class="btn-p w-100 justify-content-center" id="loginBtn" onclick="doLogin()" style="padding:11px">
+          Sign In →
+        </button>
+        <div class="err-msg" id="loginErr"></div>
+        <div class="divider-line">or</div>
+        <button class="btn-g w-100 justify-content-center" onclick="demoLogin()">
+          🎭 Try Demo Account
+        </button>
+      </div>
+
+      <!-- REGISTER -->
+      <div class="auth-panel" id="panelRegister">
+        <div class="row g-3 mb-1">
+          <div class="col-12">
+            <label class="flabel">Full Name</label>
+            <input type="text" class="fc" id="rName" placeholder="John Smith">
+          </div>
+          <div class="col-12">
+            <label class="flabel">Email Address</label>
+            <input type="email" class="fc" id="rEmail" placeholder="you@restaurant.com">
+          </div>
+          <div class="col-md-6">
+            <label class="flabel">Password</label>
+            <input type="password" class="fc" id="rPass" placeholder="Min. 6 chars">
+          </div>
+          <div class="col-md-6">
+            <label class="flabel">Role</label>
+            <select class="fc" id="rRole">
+              <option value="Admin">Admin</option>
+              <option value="Manager">Manager</option>
+              <option value="Staff" selected>Staff</option>
+              <option value="Kitchen">Kitchen</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn-p w-100 justify-content-center mt-3" id="regBtn" onclick="doRegister()" style="padding:11px">
+          Create Account →
+        </button>
+        <div class="err-msg" id="regErr"></div>
+      </div>
+
+      <p style="font-size:11.5px;color:var(--text-3);text-align:center;margin-top:18px">
+        By continuing you agree to our Terms &amp; Privacy Policy
+      </p>
+    </div><!-- /auth-card -->
+  </div><!-- /auth-container -->
+</div>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script>
+
+// Show info panel on larger screens
+if (window.innerWidth >= 900) {
+  document.getElementById('authInfo').style.display = '';
+}
+
+ThemeManager.load();
+
+// Flag set to true during registration so the auth listener
+// does NOT redirect before the Firestore role document is saved.
+let _registering = false;
+
+// Check existing session — but never interrupt an active registration
+auth.onAuthStateChanged(u => {
+  if (u && !_registering) location.href = 'dashboard.html';
+});
+
+// Load custom logo / restaurant name
+const savedLogo  = localStorage.getItem('rms_logo');
+const savedRname = localStorage.getItem('rms_rname');
+if (savedLogo)  { const el = document.getElementById('authLogo');  el.innerHTML = `<img src="${savedLogo}" alt="logo">`; }
+if (savedRname) { document.getElementById('authRestName').textContent = savedRname; }
+
+function switchTab(tab) {
+  document.getElementById('panelLogin').classList.toggle('active',    tab === 'login');
+  document.getElementById('panelRegister').classList.toggle('active', tab === 'register');
+  document.getElementById('tabLogin').classList.toggle('active',      tab === 'login');
+  document.getElementById('tabRegister').classList.toggle('active',   tab === 'register');
+}
+
+const AUTH_MSGS = {
+  'auth/user-not-found':    'No account with that email.',
+  'auth/wrong-password':    'Incorrect password.',
+  'auth/invalid-email':     'Invalid email address.',
+  'auth/too-many-requests': 'Too many attempts. Please wait.',
+  'auth/email-already-in-use': 'Email already registered.',
+  'auth/weak-password':     'Password too weak (min 6 chars).',
+  'auth/requires-recent-login': 'Please sign out and back in.',
+};
+
+async function doLogin() {
+  const email = document.getElementById('lEmail').value.trim();
+  const pass  = document.getElementById('lPass').value;
+  const errEl = document.getElementById('loginErr');
+  const btn   = document.getElementById('loginBtn');
+  errEl.textContent = '';
+  if (!email || !pass) { errEl.textContent = 'Please fill in all fields.'; return; }
+  btn.textContent = 'Signing in…'; btn.disabled = true;
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+    location.href = 'dashboard.html';
+  } catch (e) {
+    errEl.textContent = AUTH_MSGS[e.code] || e.message;
+    btn.textContent = 'Sign In →'; btn.disabled = false;
+  }
+}
+
+async function doRegister() {
+  const name  = document.getElementById('rName').value.trim();
+  const email = document.getElementById('rEmail').value.trim();
+  const pass  = document.getElementById('rPass').value;
+  const role  = document.getElementById('rRole').value;   // ← read BEFORE any async work
+  const errEl = document.getElementById('regErr');
+  const btn   = document.getElementById('regBtn');
+  errEl.textContent = '';
+
+  if (!name)        { errEl.textContent = 'Please enter your name.';       return; }
+  if (!email)       { errEl.textContent = 'Please enter your email.';      return; }
+  if (!pass)        { errEl.textContent = 'Please enter a password.';      return; }
+  if (pass.length < 6) { errEl.textContent = 'Password must be at least 6 characters.'; return; }
+  if (!role)        { errEl.textContent = 'Please select a role.';         return; }
+
+  btn.textContent = 'Creating…'; btn.disabled = true;
+
+  // Block onAuthStateChanged redirect until Firestore write is done
+  _registering = true;
+  try {
+    const { user } = await auth.createUserWithEmailAndPassword(email, pass);
+    await user.updateProfile({ displayName: name });
+
+    // Write role + full profile — must complete BEFORE we navigate
+    await db.collection(C.USERS).doc(user.uid).set({
+      displayName: name,
+      email:       email,
+      role:        role,       // ← role is captured in local var above
+      phone:       '',
+      photoURL:    '',
+      bio:         '',
+      restaurantName: 'Restaurant Pro',   // root field (used by saveBranding / loadSidebarUser)
+      preferences: {
+        theme:          'dark',
+        currency:       '₨',
+        taxRate:        8,
+        restaurantName: 'Restaurant Pro', // keep for back-compat
+      },
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // All writes done — safe to navigate
+    location.href = 'dashboard.html';
+  } catch (e) {
+    _registering = false;    // allow future auth state changes to redirect normally
+    errEl.textContent = AUTH_MSGS[e.code] || e.message;
+    btn.textContent = 'Create Account →'; btn.disabled = false;
+  }
+}
+
+async function demoLogin() {
+  const email = 'demo@restaurantpro.app', pass = 'demo123456';
+  try {
+    // Existing demo account — just sign in
+    await auth.signInWithEmailAndPassword(email, pass);
+    location.href = 'dashboard.html';
+  } catch {
+    // First time — create demo account
+    _registering = true;   // ← block redirect until Firestore write is done
+    try {
+      const { user } = await auth.createUserWithEmailAndPassword(email, pass);
+      await user.updateProfile({ displayName: 'Demo Admin' });
+      await db.collection(C.USERS).doc(user.uid).set({
+        displayName: 'Demo Admin', email, role: 'Admin',
+        phone: '', photoURL: '', bio: '',
+        restaurantName: 'Restaurant Pro',
+        preferences: { theme:'dark', currency:'₨', taxRate:8, restaurantName:'Restaurant Pro' },
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      await seedDemo();
+      location.href = 'dashboard.html';
+    } catch (err) {
+      _registering = false;
+      document.getElementById('loginErr').textContent = 'Demo login failed: ' + err.message;
+    }
+  }
+}
+
+// Enter key support
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (document.getElementById('panelLogin').classList.contains('active')) doLogin();
+  else doRegister();
+});
+</script>
+</body>
+</html>

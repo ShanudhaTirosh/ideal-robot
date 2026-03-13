@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restaurant Pro — Menu</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="page-loader" id="pageLoader"><div style="text-align:center"><div class="spinner" style="margin:0 auto 14px"></div></div></div>
+<div class="app-shell">
+  <nav class="sidebar" id="appSidebar"></nav>
+  <div class="main-area">
+    <div class="topbar" id="appTopbar"></div>
+    <div class="page-content fade-in">
+
+      <div class="section-hdr mb-4">
+        <div><h2 class="section-title">Menu Management</h2><p class="text-m" style="font-size:13px;margin:0">Images stored in MongoDB Atlas · Data in Firestore</p></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-g" onclick="catModal.show()">🏷️ Categories</button>
+          <button class="btn-p" onclick="openAddItem()">+ Add Item</button>
+        </div>
+      </div>
+
+      <div class="card-c mb-4" style="padding:12px 16px">
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <div style="position:relative">
+            <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-3)">🔍</span>
+            <input type="text" class="fc" id="menuSearch" placeholder="Search items…" style="padding-left:30px;max-width:220px" oninput="applyFilters()">
+          </div>
+          <div class="cat-pills" id="catPills" style="margin:0;flex:1"></div>
+          <select class="fc" id="sortSel" style="max-width:150px" onchange="applyFilters()">
+            <option value="name">A–Z</option>
+            <option value="price_asc">Price ↑</option>
+            <option value="price_desc">Price ↓</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="menu-grid" id="menuGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Item Modal -->
+<div class="modal modal-c fade" id="itemModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="itemModalTitle">Add Menu Item</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="iId">
+        <input type="hidden" id="iMongoImgId">
+        <div class="row g-3">
+          <div class="col-12">
+            <label class="flabel">Food Image <span style="color:var(--text-3);font-weight:400">(compressed &amp; stored in Firestore — free)</span></label>
+            <div class="img-drop" id="imgDrop" onclick="document.getElementById('imgFile').click()">
+              <span style="font-size:32px">📷</span>
+              <span>Click to upload (max 8MB)</span>
+              <input type="file" id="imgFile" accept="image/*" style="display:none" onchange="handleImgSelect(this)">
+            </div>
+            <div id="imgUploadStatus" style="font-size:12px;color:var(--text-3);margin-top:4px"></div>
+          </div>
+          <div class="col-md-6">
+            <label class="flabel">Item Name *</label>
+            <input type="text" class="fc" id="iName" placeholder="e.g. Classic Burger">
+          </div>
+          <div class="col-md-6">
+            <label class="flabel">Price *</label>
+            <input type="number" class="fc" id="iPrice" placeholder="0.00" min="0" step="0.01">
+          </div>
+          <div class="col-md-6">
+            <label class="flabel">Category *</label>
+            <select class="fc" id="iCat"><option value="">Select…</option></select>
+          </div>
+          <div class="col-md-6">
+            <label class="flabel">Availability</label>
+            <select class="fc" id="iAvail">
+              <option value="true">✅ Available</option>
+              <option value="false">❌ Unavailable</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="flabel">Description</label>
+            <textarea class="fc" id="iDesc" rows="2" placeholder="Brief description…" style="resize:vertical"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="flabel">Prep Time (mins)</label>
+            <input type="number" class="fc" id="iPrepTime" placeholder="e.g. 15" min="1">
+          </div>
+          <div class="col-md-6">
+            <label class="flabel">Tags (comma separated)</label>
+            <input type="text" class="fc" id="iTags" placeholder="spicy, vegan, popular">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-g" data-bs-dismiss="modal">Cancel</button>
+        <button class="btn-p" id="saveItemBtn" onclick="saveItem()">💾 Save Item</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Category Modal -->
+<div class="modal modal-c fade" id="categoryModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Manage Categories</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <input type="text" class="fc" id="newCatName" placeholder="New category name…" style="flex:1">
+          <button class="btn-p" onclick="addCategory()">+ Add</button>
+        </div>
+        <div id="catList"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Item Detail Modal -->
+<div class="modal modal-c fade" id="detailModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-body" style="padding:0" id="detailBody"></div>
+      <div class="modal-footer" id="detailFooter"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm -->
+<div class="modal modal-c fade" id="confirmModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-body" style="padding:26px;text-align:center">
+        <div style="font-size:34px;margin-bottom:12px">⚠️</div>
+        <div id="confirmMsg" style="font-size:13.5px;color:var(--text-2);margin-bottom:20px"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-g" id="confirmCancelBtn" data-bs-dismiss="modal" style="flex:1">Cancel</button>
+          <button class="btn-d" id="confirmOkBtn" style="flex:1">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+let allItems = [], allCats = [], selCat = 'All';
+let itemModal, catModal, detailModal;
+let pendingImgFile = null;
+
+requireAuth(user => {
+  buildSidebar(user.uid);
+  buildTopbar('Menu', 'Food catalog · Images stored free in Firestore');
+  loadSidebarUser(user);
+  itemModal   = new bootstrap.Modal(document.getElementById('itemModal'));
+  catModal    = new bootstrap.Modal(document.getElementById('categoryModal'));
+  detailModal = new bootstrap.Modal(document.getElementById('detailModal'));
+  subData();
+  Loader.hide();
+});
+
+function subData() {
+  db.collection(C.CATS).orderBy('name').onSnapshot(s => {
+    allCats = s.docs.map(d => ({id:d.id,...d.data()}));
+    buildCatPills(); populateCatSelect(); renderCatList();
+  });
+  db.collection(C.MENU).orderBy('name').onSnapshot(s => {
+    allItems = s.docs.map(d => ({id:d.id,...d.data()}));
+    applyFilters();
+  }, e => Toast.error(e.message));
+}
+
+function cn(id) { return allCats.find(c => c.id === id)?.name || 'Other'; }
+
+function buildCatPills() {
+  const cont = document.getElementById('catPills');
+  let html = `<button class="cat-pill ${selCat==='All'?'active':''}" onclick="setCat('All',this)">All</button>`;
+  for (const c of allCats) {
+    html += `<button class="cat-pill ${selCat===c.name?'active':''}" onclick="setCat('${escHtml(c.name)}',this)">${escHtml(c.name)}</button>`;
+  }
+  cont.innerHTML = html;
+}
+
+function setCat(cat, btn) {
+  selCat = cat;
+  document.querySelectorAll('#catPills .cat-pill').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  applyFilters();
+}
+
+function populateCatSelect() {
+  const sel = document.getElementById('iCat');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Select category…</option>';
+  for (const c of allCats) sel.innerHTML += `<option value="${c.id}">${escHtml(c.name)}</option>`;
+  if (cur) sel.value = cur;
+}
+
+function applyFilters() {
+  const q    = (document.getElementById('menuSearch')?.value||'').toLowerCase();
+  const sort = document.getElementById('sortSel')?.value || 'name';
+  let items  = [...allItems];
+  if (selCat !== 'All') {
+    const cid = allCats.find(c => c.name === selCat)?.id;
+    items = items.filter(i => i.categoryId === cid);
+  }
+  if (q) items = items.filter(i => (i.name||'').toLowerCase().includes(q) || cn(i.categoryId).toLowerCase().includes(q));
+  items.sort((a,b) => {
+    if (sort === 'price_asc')  return (a.price||0)-(b.price||0);
+    if (sort === 'price_desc') return (b.price||0)-(a.price||0);
+    return (a.name||'').localeCompare(b.name||'');
+  });
+  renderGrid(items);
+}
+
+function catEmoji(n) {
+  const m={Burgers:'🍔',Drinks:'🥤',Desserts:'🍰',Starters:'🥗',Mains:'🍽️',Sides:'🍟',Cocktails:'🍹',Soups:'🍲'};
+  for (const [k,v] of Object.entries(m)) if (n.toLowerCase().includes(k.toLowerCase())) return v;
+  return '🍽️';
+}
+
+function renderGrid(items) {
+  const sym  = localStorage.getItem('rms_currency')||'₨';
+  const cont = document.getElementById('menuGrid');
+  if (!items.length) {
+    cont.innerHTML = `<div class="empty-st" style="grid-column:1/-1"><div class="ei">🍕</div><div class="et">No items found</div></div>`;
+    return;
+  }
+  let html = '';
+  for (const item of items) {
+    const emoji = catEmoji(cn(item.categoryId));
+    html += `
+      <div class="menu-card" onclick="showItemDetail('${item.id}')">
+        <div class="menu-img" id="mi_${item.id}">${emoji}</div>
+        <div class="menu-body">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div class="menu-name">${escHtml(item.name)}</div>
+            ${item.available===false?`<span class="chip ch-red" style="font-size:10px;padding:2px 6px">Off</span>`:''}
+          </div>
+          <div class="menu-cat">${escHtml(cn(item.categoryId))}</div>
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div class="menu-price">${sym}${Number(item.price||0).toFixed(2)}</div>
+            ${item.prepTime?`<div style="font-size:11px;color:var(--text-3)">⏱ ${item.prepTime}m</div>`:''}
+          </div>
+          ${item.description?`<div class="menu-desc">${escHtml(item.description.slice(0,65))}${item.description.length>65?'…':''}</div>`:''}
+        </div>
+      </div>`;
+  }
+  cont.innerHTML = html;
+
+  // Load MongoDB images async
+  items.filter(i => i.mongoImageId).forEach(item => {
+    loadMongoImage(document.getElementById('mi_' + item.id), item.mongoImageId, catEmoji(cn(item.categoryId)));
+  });
+}
+
+/* ── Image handling ─────────────────────────────────────── */
+function handleImgSelect(input) {
+  const file = input.files[0];
+  if (!file) return;
+  pendingImgFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const drop = document.getElementById('imgDrop');
+    drop.innerHTML = `<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">
+      <input type="file" id="imgFile" accept="image/*" style="display:none" onchange="handleImgSelect(this)">`;
+    document.getElementById('imgUploadStatus').textContent = file.name + ' · Will upload on save';
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ── Save Item ───────────────────────────────────────────── */
+async function saveItem() {
+  const id    = document.getElementById('iId').value;
+  const name  = document.getElementById('iName').value.trim();
+  const price = parseFloat(document.getElementById('iPrice').value);
+  const catId = document.getElementById('iCat').value;
+  const desc  = document.getElementById('iDesc').value.trim();
+  const avail = document.getElementById('iAvail').value === 'true';
+  const prep  = parseInt(document.getElementById('iPrepTime').value)||null;
+  const tags  = document.getElementById('iTags').value.split(',').map(t=>t.trim()).filter(Boolean);
+
+  if (!name)          { Toast.warning('Name required.'); return; }
+  if (isNaN(price))   { Toast.warning('Enter a valid price.'); return; }
+  if (!catId)         { Toast.warning('Select a category.'); return; }
+
+  const btn = document.getElementById('saveItemBtn');
+  btn.textContent = 'Saving…'; btn.disabled = true;
+
+  try {
+    let mongoImageId = document.getElementById('iMongoImgId').value || null;
+
+    // Upload image to Firestore (compressed base64) if file selected
+    if (pendingImgFile) {
+      const statusEl = document.getElementById('imgUploadStatus');
+      statusEl.textContent = 'Compressing & uploading…';
+      try {
+        mongoImageId = await ImageService.uploadMenu(pendingImgFile, id || 'new');
+        statusEl.textContent = '✅ Image saved';
+      } catch (imgErr) {
+        statusEl.textContent = '❌ ' + imgErr.message;
+        // Continue saving item without image
+      }
+      pendingImgFile = null;
+    }
+
+    const data = { name, price, categoryId: catId, description: desc, available: avail,
+                   mongoImageId, prepTime: prep, tags, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+
+    if (id) {
+      await db.collection(C.MENU).doc(id).update(data);
+      Toast.success('Item updated!');
+    } else {
+      data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+      await db.collection(C.MENU).add(data);
+      Toast.success('Item added!');
+    }
+    itemModal.hide();
+  } catch (e) { Toast.error('Save failed: ' + e.message); }
+  finally { btn.textContent = '💾 Save Item'; btn.disabled = false; }
+}
+
+function openAddItem() {
+  document.getElementById('itemModalTitle').textContent = 'Add Menu Item';
+  document.getElementById('iId').value       = '';
+  document.getElementById('iMongoImgId').value = '';
+  document.getElementById('iName').value     = '';
+  document.getElementById('iPrice').value    = '';
+  document.getElementById('iDesc').value     = '';
+  document.getElementById('iAvail').value    = 'true';
+  document.getElementById('iPrepTime').value = '';
+  document.getElementById('iTags').value     = '';
+  document.getElementById('iCat').value      = '';
+  document.getElementById('imgDrop').innerHTML = `<span style="font-size:32px">📷</span><span>Click to upload</span><input type="file" id="imgFile" accept="image/*" style="display:none" onchange="handleImgSelect(this)">`;
+  document.getElementById('imgUploadStatus').textContent = '';
+  pendingImgFile = null;
+  populateCatSelect();
+  itemModal.show();
+}
+
+function showItemDetail(id) {
+  const item  = allItems.find(i => i.id === id);
+  if (!item) return;
+  const sym   = localStorage.getItem('rms_currency')||'₨';
+  const emoji = catEmoji(cn(item.categoryId));
+  document.getElementById('detailBody').innerHTML = `
+    <div>
+      <div class="menu-img" id="detImg" style="height:200px;font-size:64px;border-radius:var(--radius-lg) var(--radius-lg) 0 0">${emoji}</div>
+      <div style="padding:18px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <h4 style="margin:0;font-family:var(--font-d)">${escHtml(item.name)}</h4>
+          <span style="font-family:var(--font-m);font-size:22px;font-weight:700;color:var(--accent)">${sym}${Number(item.price||0).toFixed(2)}</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+          <span class="chip ch-blue">${escHtml(cn(item.categoryId))}</span>
+          ${item.available===false?`<span class="chip ch-red">Unavailable</span>`:`<span class="chip ch-green">Available</span>`}
+          ${item.prepTime?`<span class="chip ch-muted">⏱ ${item.prepTime}m</span>`:''}
+        </div>
+        ${item.description?`<p style="color:var(--text-2);font-size:13.5px;margin-bottom:10px">${escHtml(item.description)}</p>`:''}
+        ${(item.tags||[]).length?`<div style="display:flex;flex-wrap:wrap;gap:5px">${item.tags.map(t=>`<span class="chip ch-muted">${escHtml(t)}</span>`).join('')}</div>`:''}
+      </div>
+    </div>`;
+  document.getElementById('detailFooter').innerHTML = `
+    <button class="btn-g" onclick="editItem('${item.id}')">✏️ Edit</button>
+    <button class="btn-d" onclick="deleteItem('${item.id}')">🗑️ Delete</button>`;
+
+  // Load MongoDB image
+  if (item.mongoImageId) loadMongoImage(document.getElementById('detImg'), item.mongoImageId, emoji);
+  detailModal.show();
+}
+
+function editItem(id) {
+  const item = allItems.find(i => i.id === id);
+  if (!item) return;
+  detailModal.hide();
+  setTimeout(() => {
+    document.getElementById('itemModalTitle').textContent = 'Edit: ' + item.name;
+    document.getElementById('iId').value         = id;
+    document.getElementById('iMongoImgId').value = item.mongoImageId || '';
+    document.getElementById('iName').value        = item.name;
+    document.getElementById('iPrice').value       = item.price;
+    document.getElementById('iDesc').value        = item.description || '';
+    document.getElementById('iAvail').value       = item.available === false ? 'false' : 'true';
+    document.getElementById('iPrepTime').value    = item.prepTime || '';
+    document.getElementById('iTags').value        = (item.tags||[]).join(', ');
+    document.getElementById('imgDrop').innerHTML  = `<span style="font-size:32px">📷</span><span>Click to change image</span><input type="file" id="imgFile" accept="image/*" style="display:none" onchange="handleImgSelect(this)">`;
+    document.getElementById('imgUploadStatus').textContent = item.mongoImageId ? '✅ Image stored in Firestore' : '';
+    pendingImgFile = null;
+    populateCatSelect();
+    setTimeout(() => { document.getElementById('iCat').value = item.categoryId || ''; }, 100);
+
+    // Show existing mongo image in drop
+    if (item.mongoImageId) {
+      loadMongoImage(document.getElementById('imgDrop'), item.mongoImageId, '📷');
+    }
+    itemModal.show();
+  }, 320);
+}
+
+function deleteItem(id) {
+  const item = allItems.find(i => i.id === id);
+  if (!item) return;
+  detailModal.hide();
+  setTimeout(() => {
+    confirmDialog(`Delete "${item.name}"?`, async () => {
+      try {
+        // Delete image from Firestore images collection if one is stored
+        if (item.mongoImageId) await ImageService.delete(item.mongoImageId);
+        await db.collection(C.MENU).doc(id).delete();
+        await logActivity('menu_item_deleted', { name: item.name });
+        Toast.success('Item deleted.');
+      } catch (e) { Toast.error(e.message); }
+    });
+  }, 320);
+}
+
+/* ── Categories ─────────────────────────────────────────── */
+function renderCatList() {
+  const cont = document.getElementById('catList');
+  if (!cont) return;
+  if (!allCats.length) { cont.innerHTML = `<div style="color:var(--text-3);font-size:13px">No categories yet</div>`; return; }
+  let html = '';
+  for (const c of allCats) {
+    const count = allItems.filter(i => i.categoryId === c.id).length;
+    html += `<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--bg-tertiary);border-radius:var(--radius-sm);margin-bottom:6px">
+      <span style="flex:1;font-size:13.5px">${escHtml(c.name)}</span>
+      <span style="font-size:12px;color:var(--text-3)">${count} items</span>
+      <button class="btn-d btn-sm" onclick="deleteCat('${c.id}','${escHtml(c.name)}')">🗑️</button>
+    </div>`;
+  }
+  cont.innerHTML = html;
+}
+async function addCategory() {
+  const name = document.getElementById('newCatName').value.trim();
+  if (!name) { Toast.warning('Enter a name.'); return; }
+  await db.collection(C.CATS).add({ name, createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+  document.getElementById('newCatName').value = '';
+  Toast.success('Category added!');
+}
+function deleteCat(id, name) {
+  const count = allItems.filter(i => i.categoryId === id).length;
+  confirmDialog(`Delete "${name}"?${count?' '+count+' item(s) will lose category.':''}`, async () => {
+    await db.collection(C.CATS).doc(id).delete();
+    Toast.success('Category deleted.');
+  });
+}
+</script>
+</body>
+</html>

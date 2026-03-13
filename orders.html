@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Restaurant Pro — Orders</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/app.css">
+  <style>
+    .pos-layout { display:grid; grid-template-columns:1fr 330px; gap:18px; height:calc(100vh - 60px - 44px); }
+    @media(max-width:900px) { .pos-layout { grid-template-columns:1fr; height:auto; } }
+    .otype-btn { padding:7px 16px;border-radius:999px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-2);font-size:13px;font-weight:500;cursor:pointer;transition:var(--transition); }
+    .otype-btn.active { background:var(--accent);color:#000;border-color:var(--accent);font-weight:600; }
+    .live-item { padding:12px 16px;border-bottom:1px solid var(--border-subtle);cursor:pointer;transition:var(--transition); }
+    .live-item:hover { background:var(--bg-card-hover); }
+    .live-item.sel { background:var(--accent-soft);border-left:3px solid var(--accent); }
+    .tab-pane { display:none; }
+    .tab-pane.active { display:flex; flex-direction:column; flex:1; overflow:hidden; }
+  </style>
+</head>
+<body>
+
+<div class="page-loader" id="pageLoader">
+  <div style="text-align:center"><div class="spinner" style="margin:0 auto 14px"></div></div>
+</div>
+
+<div class="app-shell">
+  <nav class="sidebar" id="appSidebar"></nav>
+  <div class="main-area">
+    <div class="topbar" id="appTopbar"></div>
+    <div class="page-content fade-in" style="display:flex;flex-direction:column;padding-bottom:0;height:calc(100vh - 60px)">
+
+      <!-- Main Tabs -->
+      <div style="display:flex;gap:10px;margin-bottom:14px;flex-shrink:0">
+        <button class="otype-btn active" id="mainTab-new"  onclick="switchMain('new')">🛒 New Order</button>
+        <button class="otype-btn"        id="mainTab-live" onclick="switchMain('live')">📡 Live Orders</button>
+      </div>
+
+      <!-- ============ NEW ORDER PANE ============ -->
+      <div class="tab-pane active" id="pane-new">
+        <div class="pos-layout" style="flex:1;overflow:hidden">
+
+          <!-- Left: Menu Picker -->
+          <div style="display:flex;flex-direction:column;gap:10px;overflow:hidden">
+
+            <!-- Order meta bar -->
+            <div class="card-c" style="padding:12px;flex-shrink:0">
+              <div id="orderMetaBar"></div>
+            </div>
+
+            <!-- Category + search filter -->
+            <div class="card-c" style="padding:10px 14px;flex-shrink:0">
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <div style="position:relative;flex-shrink:0">
+                  <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-3)">🔍</span>
+                  <input type="text" class="fc" id="menuSearch" placeholder="Search dishes…" style="padding-left:30px;max-width:200px" oninput="renderMenuPicker()">
+                </div>
+                <div class="cat-pills" id="pickerCats" style="margin:0;flex:1"></div>
+              </div>
+            </div>
+
+            <!-- Menu items -->
+            <div style="overflow-y:auto;flex:1">
+              <div class="menu-grid" id="menuPicker"></div>
+            </div>
+          </div>
+
+          <!-- Right: Order Panel -->
+          <div class="order-panel" style="overflow:hidden">
+            <div class="op-header">
+              <div style="font-family:var(--font-d);font-size:15px;font-weight:600">Current Order</div>
+              <div id="orderTypeLabel" style="font-size:12px;color:var(--text-3)">Table Order</div>
+            </div>
+            <div class="scroll-y" id="orderItemsList" style="flex:1"></div>
+            <div class="op-totals">
+              <div class="total-row"><span>Subtotal</span><span class="mono" id="ot-sub">—</span></div>
+              <div class="total-row"><span id="taxLabel">Tax (8%)</span><span class="mono" id="ot-tax">—</span></div>
+              <div class="total-row grand"><span>Total</span><span class="mono amt" id="ot-total">—</span></div>
+              <textarea class="fc" id="orderNotes" placeholder="Order notes…" rows="2" style="font-size:12px;resize:none;margin-top:10px"></textarea>
+              <button class="btn-p" style="width:100%;justify-content:center;padding:11px;margin-top:8px" onclick="placeOrder()">
+                ✅ Place Order
+              </button>
+              <button class="btn-g" style="width:100%;justify-content:center;font-size:12px;margin-top:6px" onclick="clearOrder()">
+                🗑️ Clear
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ============ LIVE ORDERS PANE ============ -->
+      <div class="tab-pane" id="pane-live">
+        <div style="display:grid;grid-template-columns:1fr 390px;gap:18px;flex:1;overflow:hidden">
+
+          <!-- List -->
+          <div style="display:flex;flex-direction:column;overflow:hidden">
+            <div style="display:flex;gap:7px;margin-bottom:10px;flex-wrap:wrap;flex-shrink:0" id="statusFilter"></div>
+            <div class="card-c" style="padding:0;overflow:hidden;flex:1;display:flex;flex-direction:column">
+              <div style="padding:9px 16px;border-bottom:1px solid var(--border);background:var(--bg-tertiary);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
+                <span style="font-size:11px;font-weight:700;color:var(--text-3);letter-spacing:.8px">ORDERS</span>
+                <span class="chip ch-blue" id="liveCount">0</span>
+              </div>
+              <div class="scroll-y" id="liveList" style="flex:1"></div>
+            </div>
+          </div>
+
+          <!-- Detail -->
+          <div class="order-panel" id="liveDetail" style="overflow:hidden">
+            <div class="op-header">
+              <div style="font-family:var(--font-d);font-size:15px;font-weight:600">Order Details</div>
+            </div>
+            <div class="empty-st" style="flex:1">
+              <div class="ei">👈</div><div class="et">Select an order</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="modal modal-c fade" id="confirmModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered modal-sm">
+    <div class="modal-content">
+      <div class="modal-body" style="padding:26px;text-align:center">
+        <div style="font-size:34px;margin-bottom:12px">⚠️</div>
+        <div id="confirmMsg" style="font-size:13.5px;color:var(--text-2);margin-bottom:20px"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-g" id="confirmCancelBtn" data-bs-dismiss="modal" style="flex:1">Cancel</button>
+          <button class="btn-d" id="confirmOkBtn" style="flex:1">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="js/firebase-config.js"></script>
+<script src="js/utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+/* ── State ─────────────────────────────────────────────── */
+let menuItems    = [], categories  = [], tables = [];
+let cart         = [];
+let orderType    = 'Table Order';
+let pickerCat    = 'All';
+let liveFilter   = 'All';
+let liveOrders   = [];
+let selOrderId   = null;
+let liveUnsub    = null;
+
+/* ── Boot ──────────────────────────────────────────────── */
+requireAuth(user => {
+  buildSidebar(user.uid);
+  buildTopbar('Orders', 'POS & live order management');
+  loadSidebarUser(user);
+  loadPickerData();
+  startLiveSub();
+  buildStatusFilterUI();
+  Loader.hide();
+
+  // Pre-select table from URL param
+  const tp = new URLSearchParams(location.search).get('table');
+  if (tp) setTimeout(() => {
+    const sel = document.getElementById('tableSelect');
+    if (sel) sel.value = tp;
+  }, 800);
+});
+
+/* ── Tab switching ─────────────────────────────────────── */
+function switchMain(tab) {
+  ['new','live'].forEach(t => {
+    document.getElementById('pane-' + t).classList.toggle('active', t === tab);
+    document.getElementById('mainTab-' + t).classList.toggle('active', t === tab);
+  });
+}
+
+/* ── Load menu data ────────────────────────────────────── */
+async function loadPickerData() {
+  const [catSnap, itemSnap, tableSnap] = await Promise.all([
+    db.collection(C.CATS).orderBy('name').get(),
+    db.collection(C.MENU).orderBy('name').get(),
+    db.collection(C.TABLES).orderBy('number').get(),
+  ]);
+  categories = catSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  menuItems  = itemSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+  tables     = tableSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+  buildMetaBar();
+  buildPickerCatPills();
+  renderMenuPicker();
+  renderCart();
+}
+
+function getCatName(id) {
+  return categories.find(c => c.id === id)?.name || 'Other';
+}
+
+/* ── Order type meta bar ─────────────────────────────────
+   NOTE: All HTML built in JS — no template literals in static HTML
+*/
+function buildMetaBar() {
+  const bar  = document.getElementById('orderMetaBar');
+  const types = ['Table Order', 'Takeaway', 'Pre-order'];
+
+  // Type buttons
+  let html = '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end">';
+  html += '<div style="margin-right:8px">';
+  for (const t of types) {
+    const active = t === orderType ? 'active' : '';
+    html += `<button class="otype-btn ${active}" data-ot="${escHtml(t)}" onclick="setOrderType('${escHtml(t)}',this)">${escHtml(t)}</button>`;
+  }
+  html += '</div>';
+
+  // Table select
+  html += `<div id="tableWrap" style="${orderType !== 'Table Order' ? 'display:none' : ''}">`;
+  html += '<label class="flabel" style="margin-bottom:3px">Table</label>';
+  html += '<select class="fc" id="tableSelect" style="min-width:130px">';
+  html += '<option value="">Select table…</option>';
+  for (const t of tables) {
+    const occ = t.status === 'Occupied' ? ' (Occupied)' : '';
+    html += `<option value="${t.number}">#${t.number} ${escHtml(t.area)}${occ}</option>`;
+  }
+  html += '</select></div>';
+
+  // Customer name
+  html += `<div id="custWrap" style="${orderType === 'Table Order' ? 'display:none' : ''}">`;
+  html += '<label class="flabel" style="margin-bottom:3px">Customer</label>';
+  html += `<input type="text" class="fc" id="custName" placeholder="Optional" style="min-width:140px"></div>`;
+
+  // Schedule time
+  html += `<div id="schedWrap" style="${orderType !== 'Pre-order' ? 'display:none' : ''}">`;
+  html += '<label class="flabel" style="margin-bottom:3px">Scheduled</label>';
+  html += `<input type="datetime-local" class="fc" id="schedTime" style="min-width:180px"></div>`;
+
+  html += '</div>';
+  bar.innerHTML = html;
+}
+
+function setOrderType(type, btn) {
+  orderType = type;
+  document.querySelectorAll('[data-ot]').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('orderTypeLabel').textContent = type;
+  const tableWrap = document.getElementById('tableWrap');
+  const custWrap  = document.getElementById('custWrap');
+  const schedWrap = document.getElementById('schedWrap');
+  if (tableWrap) tableWrap.style.display = type === 'Table Order' ? '' : 'none';
+  if (custWrap)  custWrap.style.display  = type !== 'Table Order' ? '' : 'none';
+  if (schedWrap) schedWrap.style.display = type === 'Pre-order'   ? '' : 'none';
+}
+
+/* ── Category Pills ─────────────────────────────────────── */
+function buildPickerCatPills() {
+  const container = document.getElementById('pickerCats');
+  let html = `<button class="cat-pill ${pickerCat === 'All' ? 'active' : ''}" onclick="setPickerCat('All',this)">All</button>`;
+  for (const c of categories) {
+    const active = pickerCat === c.name ? 'active' : '';
+    html += `<button class="cat-pill ${active}" onclick="setPickerCat('${escHtml(c.name)}',this)">${escHtml(c.name)}</button>`;
+  }
+  container.innerHTML = html;
+}
+
+function setPickerCat(cat, btn) {
+  pickerCat = cat;
+  document.querySelectorAll('#pickerCats .cat-pill').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderMenuPicker();
+}
+
+/* ── Menu Picker ─────────────────────────────────────────── */
+function renderMenuPicker() {
+  const search  = (document.getElementById('menuSearch')?.value || '').toLowerCase();
+  let items     = menuItems.filter(i => i.available !== false);
+
+  if (pickerCat !== 'All') {
+    const catId = categories.find(c => c.name === pickerCat)?.id;
+    items = items.filter(i => i.categoryId === catId);
+  }
+  if (search) items = items.filter(i => (i.name || '').toLowerCase().includes(search));
+
+  const container = document.getElementById('menuPicker');
+  if (!items.length) {
+    container.innerHTML = `<div class="empty-st" style="grid-column:1/-1"><div class="ei">🍽️</div><div class="et">No items found</div></div>`;
+    return;
+  }
+
+  let html = '';
+  for (const item of items) {
+    const inCart  = cart.find(c => c.id === item.id);
+    const qtyBadge = inCart
+      ? `<div style="position:absolute;top:8px;right:8px;background:var(--accent);color:#000;border-radius:999px;padding:2px 8px;font-size:11px;font-weight:700">${inCart.qty}</div>`
+      : '';
+    const emoji   = catEmoji(getCatName(item.categoryId));
+    const imgHtml = item.mongoImageId
+      ? `<div class="menu-img" id="mimg_${item.id}" style="position:relative">${qtyBadge}${emoji}</div>`
+      : `<div class="menu-img" style="position:relative">${emoji}${qtyBadge}</div>`;
+
+    html += `
+      <div class="menu-card" onclick="addToCart('${item.id}')">
+        ${imgHtml}
+        <div class="menu-body">
+          <div class="menu-name">${escHtml(item.name)}</div>
+          <div class="menu-cat">${escHtml(getCatName(item.categoryId))}</div>
+          <div class="menu-price">${fmt.currency(item.price)}</div>
+        </div>
+      </div>`;
+  }
+  container.innerHTML = html;
+
+  // Load mongo images async (non-blocking)
+  items.filter(i => i.mongoImageId).forEach(item => {
+    loadMongoImage(document.getElementById('mimg_' + item.id), item.mongoImageId, catEmoji(getCatName(item.categoryId)));
+  });
+}
+
+function catEmoji(name) {
+  const map = { Burgers:'🍔', Drinks:'🥤', Desserts:'🍰', Starters:'🥗', Mains:'🍽️',
+                Sides:'🍟', Pizza:'🍕', Sushi:'🍣', Pasta:'🍝', Cocktails:'🍹', Soups:'🍲' };
+  for (const [k, v] of Object.entries(map)) if (name.toLowerCase().includes(k.toLowerCase())) return v;
+  return '🍽️';
+}
+
+/* ── Cart ────────────────────────────────────────────────── */
+function addToCart(itemId) {
+  const item = menuItems.find(i => i.id === itemId);
+  if (!item) return;
+  const ex = cart.find(c => c.id === itemId);
+  if (ex) ex.qty++;
+  else cart.push({ id: itemId, name: item.name, price: item.price, qty: 1 });
+  renderCart();
+  renderMenuPicker();
+}
+
+function changeQty(itemId, delta) {
+  const idx = cart.findIndex(c => c.id === itemId);
+  if (idx < 0) return;
+  cart[idx].qty += delta;
+  if (cart[idx].qty <= 0) cart.splice(idx, 1);
+  renderCart();
+  renderMenuPicker();
+}
+
+function removeFromCart(itemId) {
+  cart = cart.filter(c => c.id !== itemId);
+  renderCart();
+  renderMenuPicker();
+}
+
+function clearOrder() {
+  cart = [];
+  renderCart();
+  renderMenuPicker();
+}
+
+function renderCart() {
+  const container = document.getElementById('orderItemsList');
+  const curSym    = localStorage.getItem('rms_currency') || '₨';
+  const taxRate   = getTaxRate();
+  const taxPct    = Math.round(taxRate * 100);
+  document.getElementById('taxLabel').textContent = `Tax (${taxPct}%)`;
+
+  if (!cart.length) {
+    container.innerHTML = `<div class="empty-st" style="padding:32px 16px"><div class="ei" style="font-size:32px">🛒</div><div class="et">Tap a dish to add</div></div>`;
+    updateTotalsDisplay(0);
+    return;
+  }
+
+  let html = '';
+  for (const item of cart) {
+    html += `
+      <div class="op-item">
+        <div style="flex:1;min-width:0">
+          <div class="op-name">${escHtml(item.name)}</div>
+          <div class="op-unit">${curSym}${item.price.toFixed(2)} each</div>
+        </div>
+        <div class="qty-ctrl">
+          <button class="qty-btn" onclick="changeQty('${item.id}',-1)">−</button>
+          <div class="qty-num">${item.qty}</div>
+          <button class="qty-btn" onclick="changeQty('${item.id}',1)">+</button>
+        </div>
+        <div class="op-price">${curSym}${(item.price * item.qty).toFixed(2)}</div>
+        <button onclick="removeFromCart('${item.id}')" style="background:none;border:none;color:var(--text-3);cursor:pointer;padding:0 4px;font-size:16px;flex-shrink:0">✕</button>
+      </div>`;
+  }
+  container.innerHTML = html;
+
+  const subtotal = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  updateTotalsDisplay(subtotal);
+}
+
+function updateTotalsDisplay(subtotal) {
+  const { tax, total } = calcTotals(subtotal);
+  const sym = localStorage.getItem('rms_currency') || '₨';
+  document.getElementById('ot-sub').textContent   = sym + subtotal.toFixed(2);
+  document.getElementById('ot-tax').textContent   = sym + tax.toFixed(2);
+  document.getElementById('ot-total').textContent = sym + total.toFixed(2);
+}
+
+/* ── Place Order ─────────────────────────────────────────── */
+async function placeOrder() {
+  if (!cart.length) { Toast.warning('Add at least one item.'); return; }
+  const tableNum = document.getElementById('tableSelect')?.value;
+  if (orderType === 'Table Order' && !tableNum) { Toast.warning('Please select a table.'); return; }
+
+  const subtotal  = cart.reduce((s, i) => s + i.price * i.qty, 0);
+  const { tax, total } = calcTotals(subtotal);
+  const custName  = document.getElementById('custName')?.value.trim() || null;
+  const schedTime = document.getElementById('schedTime')?.value;
+  const notes     = document.getElementById('orderNotes').value.trim();
+
+  try {
+    // Get sequential order number
+    const orderNum = await getNextOrderNumber();
+
+    const orderData = {
+      orderNumber:  orderNum,
+      type:         orderType,
+      status:       'Pending',
+      items:        cart.map(i => ({ id: i.id, name: i.name, price: i.price, qty: i.qty })),
+      subtotal, tax, total,
+      tableNumber:  tableNum ? parseInt(tableNum) : null,
+      customerName: custName,
+      scheduledAt:  schedTime ? new Date(schedTime) : null,
+      notes:        notes || null,
+      createdBy:    firebase.auth().currentUser.uid,
+      createdAt:    firebase.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const ref = await db.collection(C.ORDERS).add(orderData);
+
+    // Mark table occupied
+    if (tableNum && orderType === 'Table Order') {
+      const table = tables.find(t => t.number === parseInt(tableNum));
+      if (table) await db.collection(C.TABLES).doc(table.id).update({ status: 'Occupied' });
+    }
+
+    await logActivity('order_placed', { orderId: ref.id, orderNumber: orderNum, type: orderType });
+    Toast.success('Order #' + orderNum + ' placed!');
+    clearOrder();
+    document.getElementById('orderNotes').value = '';
+    switchMain('live');
+
+  } catch (e) { Toast.error('Failed: ' + e.message); }
+}
+
+/* ── Live Orders ─────────────────────────────────────────── */
+const STATUSES = ['All','Pending','Cooking','Ready','Served','Paid','Cancelled'];
+
+function buildStatusFilterUI() {
+  const container = document.getElementById('statusFilter');
+  let html = '';
+  for (const s of STATUSES) {
+    html += `<button class="otype-btn ${s === 'All' ? 'active' : ''}" onclick="setLiveFilter('${s}',this)">${s}</button>`;
+  }
+  container.innerHTML = html;
+}
+
+function setLiveFilter(s, btn) {
+  liveFilter = s;
+  document.querySelectorAll('#statusFilter .otype-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderLiveList();
+}
+
+function startLiveSub() {
+  if (liveUnsub) liveUnsub();
+  liveUnsub = db.collection(C.ORDERS)
+    .orderBy('createdAt', 'desc')
+    .limit(80)
+    .onSnapshot(snap => {
+      liveOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      renderLiveList();
+    }, () => {});
+}
+
+function renderLiveList() {
+  const orders = liveFilter === 'All' ? liveOrders : liveOrders.filter(o => o.status === liveFilter);
+  document.getElementById('liveCount').textContent = orders.length;
+  const container = document.getElementById('liveList');
+
+  if (!orders.length) {
+    container.innerHTML = `<div class="empty-st" style="padding:32px"><div class="ei">📡</div><div class="et">No orders found</div></div>`;
+    return;
+  }
+
+  let html = '';
+  for (const o of orders) {
+    const itemCount = (o.items || []).reduce((s, i) => s + i.qty, 0);
+    const sel = selOrderId === o.id ? 'sel' : '';
+    html += `
+      <div class="live-item ${sel}" onclick="selectLiveOrder('${o.id}')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px">
+              <span class="order-num-badge">${o.orderNumber || '?'}</span>
+              <div>
+                <div style="font-weight:600;font-size:13px">${escHtml(o.type)}</div>
+                <div style="font-size:11px;color:var(--text-3)">${o.tableNumber ? 'Table ' + o.tableNumber + ' · ' : ''}${itemCount} items</div>
+              </div>
+            </div>
+          </div>
+          <div style="text-align:right">
+            ${statusChip(o.status)}
+            <div style="font-family:var(--font-m);font-size:13px;color:var(--accent);margin-top:4px">${fmt.currency(o.total)}</div>
+          </div>
+        </div>
+        <div style="font-size:10.5px;color:var(--text-3);margin-top:6px">${fmt.time(o.createdAt)}</div>
+      </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function selectLiveOrder(id) {
+  selOrderId = id;
+  renderLiveList();
+  const order = liveOrders.find(o => o.id === id);
+  if (order) renderLiveDetail(order);
+}
+
+function renderLiveDetail(order) {
+  const panel = document.getElementById('liveDetail');
+  const nextMap = {
+    Pending:   ['Cooking', 'Cancelled'],
+    Cooking:   ['Ready',   'Cancelled'],
+    Ready:     ['Served'],
+    Served:    ['Paid'],
+    Paid:      [],
+    Cancelled: [],
+  };
+  const next = nextMap[order.status] || [];
+  const sym  = localStorage.getItem('rms_currency') || '₨';
+
+  let itemsHtml = '';
+  for (const item of (order.items || [])) {
+    itemsHtml += `
+      <div class="op-item">
+        <div style="flex:1"><div class="op-name">${escHtml(item.name)}</div><div class="op-unit">×${item.qty} @ ${sym}${(item.price || 0).toFixed(2)}</div></div>
+        <div class="op-price">${sym}${((item.price || 0) * item.qty).toFixed(2)}</div>
+      </div>`;
+  }
+
+  let actionHtml = '';
+  for (const s of next) {
+    const cls = s === 'Cancelled' ? 'btn-d' : 'btn-p';
+    const lbl = s === 'Cancelled' ? '❌ Cancel' : '→ Mark as ' + s;
+    actionHtml += `<button class="${cls}" style="width:100%;justify-content:center;margin-bottom:6px" onclick="advanceOrder('${order.id}','${s}')">${lbl}</button>`;
+  }
+  if (order.status === 'Served' || order.status === 'Paid') {
+    actionHtml += `<a href="billing.html?order=${order.id}" class="btn-s" style="width:100%;justify-content:center">💳 Generate Bill</a>`;
+  }
+
+  panel.innerHTML = `
+    <div class="op-header">
+      <div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="order-num-badge">${order.orderNumber || '?'}</span>
+          <div>
+            <div style="font-family:var(--font-d);font-size:15px;font-weight:600">${escHtml(order.type)}</div>
+            <div style="font-size:11.5px;color:var(--text-3)">${order.tableNumber ? 'Table ' + order.tableNumber : (order.customerName || '')} · ${fmt.time(order.createdAt)}</div>
+          </div>
+        </div>
+      </div>
+      ${statusChip(order.status)}
+    </div>
+    <div class="scroll-y" style="flex:1">${itemsHtml}${order.notes ? `<div style="padding:10px 16px;font-size:12px;color:var(--text-3);border-top:1px solid var(--border-subtle)">📝 ${escHtml(order.notes)}</div>` : ''}</div>
+    <div class="op-totals">
+      <div class="total-row"><span>Subtotal</span><span class="mono">${sym}${(order.subtotal||0).toFixed(2)}</span></div>
+      <div class="total-row"><span>Tax</span><span class="mono">${sym}${(order.tax||0).toFixed(2)}</span></div>
+      <div class="total-row grand"><span>Total</span><span class="mono amt">${sym}${(order.total||0).toFixed(2)}</span></div>
+      <div style="margin-top:10px">${actionHtml}</div>
+    </div>`;
+}
+
+async function advanceOrder(orderId, newStatus) {
+  try {
+    await db.collection(C.ORDERS).doc(orderId).update({
+      status: newStatus,
+      [`${newStatus.toLowerCase()}At`]: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    if (newStatus === 'Served') {
+      const order = liveOrders.find(o => o.id === orderId);
+      if (order?.tableNumber) {
+        const table = tables.find(t => t.number === order.tableNumber);
+        if (table) await db.collection(C.TABLES).doc(table.id).update({ status: 'Available' });
+      }
+    }
+    await logActivity('order_advanced', { orderId, status: newStatus });
+    Toast.success('Order → ' + newStatus);
+  } catch (e) { Toast.error(e.message); }
+}
+</script>
+</body>
+</html>

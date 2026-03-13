@@ -1,0 +1,93 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helpers ────────────────────────────────────────────────
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Bug 3 fix: safely read role — returns 'Staff' if document
+    // doesn't exist yet (e.g. brand-new user during registration).
+    function userRole() {
+      let userDoc = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(userDoc)
+        ? get(userDoc).data.get('role', 'Staff')
+        : 'Staff';
+    }
+
+    function isAdmin()   { return isAuth() && userRole() == 'Admin'; }
+    function isManager() { return isAuth() && (userRole() == 'Admin' || userRole() == 'Manager'); }
+
+    // ── Users ──────────────────────────────────────────────────
+    // Any authenticated user can read and write their OWN document.
+    // Admins can read any user document.
+    match /users/{uid} {
+      allow read:  if isAuth() && (request.auth.uid == uid || isAdmin());
+      allow write: if isAuth() && request.auth.uid == uid;
+    }
+
+    // ── Images (base64 in Firestore) ───────────────────────────
+    match /images/{imageId} {
+      allow read:   if isAuth();
+      allow create: if isAuth();
+      allow delete: if isAuth() && (
+        resource.data.uploadedBy == request.auth.uid || isAdmin()
+      );
+      allow update: if false;  // images are immutable — delete + re-upload
+    }
+
+    // ── Tables ────────────────────────────────────────────────
+    match /tables/{tableId} {
+      allow read:   if isAuth();
+      allow create: if isManager();
+      allow update: if isAuth();   // any staff can change table status
+      allow delete: if isManager();
+    }
+
+    // ── Menu items ────────────────────────────────────────────
+    match /menu_items/{itemId} {
+      allow read:  if isAuth();
+      allow write: if isManager();
+    }
+
+    // ── Categories ────────────────────────────────────────────
+    match /categories/{catId} {
+      allow read:  if isAuth();
+      allow write: if isManager();
+    }
+
+    // ── Orders ────────────────────────────────────────────────
+    match /orders/{orderId} {
+      allow read:   if isAuth();
+      allow create: if isAuth();
+      allow update: if isAuth();
+      allow delete: if isAdmin();
+    }
+
+    // ── Bills ─────────────────────────────────────────────────
+    match /bills/{billId} {
+      allow read:   if isAuth();
+      allow create: if isAuth();
+      allow update: if isManager();
+      allow delete: if isAdmin();
+    }
+
+    // ── Counters (sequential order numbers) ───────────────────
+    match /counters/{docId} {
+      allow read, write: if isAuth();
+    }
+
+    // ── Dashboard layouts ─────────────────────────────────────
+    match /layouts/{uid} {
+      allow read, write: if isAuth() && request.auth.uid == uid;
+    }
+
+    // ── Activity log (append-only) ────────────────────────────
+    match /activity_log/{docId} {
+      allow read:          if isAuth() && (resource.data.uid == request.auth.uid || isAdmin());
+      allow create:        if isAuth();
+      allow update, delete: if false;
+    }
+  }
+}
